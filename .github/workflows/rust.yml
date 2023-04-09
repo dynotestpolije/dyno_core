@@ -61,8 +61,7 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-          components: rustfmt
-          components: clippy
+          components: rustfmt, clippy
 
       - name: Set up cargo cache
         uses: Swatinem/rust-cache@v2
