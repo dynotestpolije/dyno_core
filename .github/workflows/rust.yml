@@ -9,39 +9,8 @@ name: CI
 #   # RUSTFLAGS: --cfg=web_sys_unstable_apis
 
 jobs:
-  check:
-    name: Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all-features
-
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      # - run: sudo apt-get install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --lib
-
-  fmt:
-    name: Rustfmt
+  linux:
+    name: Check Format and Test 
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -51,26 +20,35 @@ jobs:
           toolchain: stable
           override: true
           components: rustfmt
-      - uses: actions-rs/cargo@v1
+          components: clippy
+
+      - name: Set up cargo cache (Linux)
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check (Linux)
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --all-features
+
+      - name: Test (Linux)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features
+
+      - name: Fmt (Linux)
+        uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all -- --check
 
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: clippy
-      - uses: actions-rs/cargo@v1
+      - name: Clippy (Linux)
+        uses: actions-rs/cargo@v1
         with:
           command: clippy
           args: --all-targets --all-features --  -D warnings -W clippy::all
+
 
   windows:
     name: Check Windows
@@ -80,14 +58,34 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.65.0
+          toolchain: stable
           override: true
+          components: rustfmt
+          components: clippy
 
       - name: Set up cargo cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Check
+      - name: Check (Win)
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --all-targets --all-features
+
+      - name: Test (Win)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features
+
+      - name: Fmt (Win)
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+      - name: Clippy (Win)
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --all-targets --all-features --  -D warnings -W clippy::all

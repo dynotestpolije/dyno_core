@@ -11,6 +11,7 @@ pub mod convertions;
 pub use data_structure::*;
 pub use error::*;
 pub use ext::*;
+pub use logger::*;
 
 #[cfg(any(feature = "backend", feature = "frontend"))]
 pub mod server;
@@ -38,6 +39,8 @@ pub use regex;
 
 #[cfg(feature = "frontend")]
 pub use reqwest;
+
+pub use lazy_static;
 
 pub use paste;
 

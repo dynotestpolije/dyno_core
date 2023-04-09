@@ -1,18 +1,17 @@
 // TODO: include the changelog as a module when
 // https://github.com/rust-lang/rust/issues/44732 stabilises
 
-use log::{LevelFilter, Log, Metadata, Record};
-use std::fs::File;
+use log::{Level, LevelFilter, Log, Metadata, Record};
 use std::io;
 use std::io::Write;
 use std::path::Path;
 use std::sync::Mutex;
-use std::time::Instant;
 
 use crate::DynoResult;
 
 lazy_static::lazy_static! {
-    pub static ref LOGGER: DynoLogger = DynoLogger::default() ;
+    pub static ref RECORDS_LOGGER: Mutex<Vec<(Level, String)>> = Default::default();
+    static ref LOGGER: DynoLogger = DynoLogger::default();
 }
 
 #[derive(Default)]
@@ -29,7 +28,6 @@ impl DynoLogger {
             .lock()
             .map_err(|_| "Failed to lock the mutex Logger")?;
         *lock = Some(DynoLoggerInner {
-            start: Instant::now(),
             sink: Box::new(sink),
         });
 
@@ -38,10 +36,12 @@ impl DynoLogger {
 }
 
 impl Log for DynoLogger {
-    fn enabled(&self, _: &Metadata) -> bool {
-        true
+    #[inline(always)]
+    fn enabled(&self, m: &Metadata) -> bool {
+        m.level() < log::max_level()
     }
 
+    #[inline]
     fn log(&self, record: &Record) {
         if !self.enabled(record.metadata()) {
             return;
@@ -53,41 +53,59 @@ impl Log for DynoLogger {
         }
     }
 
-    fn flush(&self) {}
+    #[inline]
+    fn flush(&self) {
+        if let Ok(mut locked) = self.inner.lock() {
+            if let Some(ref mut inner) = *locked {
+                inner.flush()
+            }
+        }
+    }
 }
 
 struct DynoLoggerInner {
-    start: Instant,
     sink: Box<dyn Write + Send>,
 }
 
 impl DynoLoggerInner {
     fn log(&mut self, record: &Record) {
-        let now = self.start.elapsed();
-        let seconds = now.as_secs();
-        let hours = seconds / 3600;
-        let minutes = (seconds / 60) % 60;
-        let seconds = seconds % 60;
-        let miliseconds = now.subsec_millis();
-
-        let _ = writeln!(
-            self.sink,
-            "[{:02}:{:02}:{:02}.{:03}] {:6} {}",
-            hours,
-            minutes,
-            seconds,
-            miliseconds,
-            record.level(),
+        let level = record.level();
+        let record_string = format!(
+            "[{}]:[{}]:{:6} - {}\n",
+            chrono::Utc::now().format("%+"),
+            record.metadata().target(),
+            level,
             record.args()
-        )
-        .ok();
+        );
+        self.sink.write(record_string.as_bytes()).ok();
+
+        if let Ok(mut locked) = RECORDS_LOGGER.lock() {
+            locked.push((level, record_string));
+        }
+    }
+    #[inline]
+    fn flush(&mut self) {
+        self.sink.flush().ok();
     }
 }
 
-#[inline(always)]
 #[allow(unused)]
-pub fn log_to_file<'a, T: AsRef<Path>>(path: T, max_log_level: LevelFilter) -> DynoResult<'a, ()> {
-    let file = File::create(path)?;
+pub fn log_to_file<'a, T: AsRef<Path>>(
+    path: T,
+    max_log_level: LevelFilter,
+    append: bool,
+) -> DynoResult<'a, ()> {
+    let path = path.as_ref();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .append(append)
+        .truncate(!append)
+        .create(true)
+        .open(path)?;
+
     LOGGER.renew(file)?;
     log::set_max_level(max_log_level);
     // The only possible error is if this has been called before
@@ -100,7 +118,6 @@ pub fn log_to_file<'a, T: AsRef<Path>>(path: T, max_log_level: LevelFilter) -> D
 }
 
 #[allow(unused)]
-#[inline(always)]
 pub fn log_to_stderr<'a>(max_log_level: LevelFilter) -> DynoResult<'a, ()> {
     LOGGER.renew(io::stderr())?;
     log::set_max_level(max_log_level);
