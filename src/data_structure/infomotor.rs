@@ -1,5 +1,5 @@
 #[cfg_attr(feature = "use_serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Stroke {
     Unknown = 0,
     Two = 2,
@@ -36,7 +36,7 @@ impl From<u8> for Stroke {
 }
 
 #[cfg_attr(feature = "use_serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Transmition {
     Unknown,
     #[default]
@@ -71,7 +71,7 @@ impl From<u8> for Transmition {
 }
 
 #[cfg_attr(feature = "use_serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Cylinder {
     #[default]
     Single,
@@ -127,7 +127,7 @@ impl From<u8> for Cylinder {
 
 use crate::{DynoErr, ResultHandler};
 
-#[derive(Clone, derive_more::Display)]
+#[derive(Debug, Clone, derive_more::Display)]
 #[cfg_attr(feature = "use_serde", derive(serde::Deserialize, serde::Serialize))]
 #[display(fmt = "`{name}` - |`{cc}`|`{cylinder}`|`{stroke}`|`{transmition}`|`{tire_diameter}`|")]
 pub struct InfoMotor {

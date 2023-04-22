@@ -83,7 +83,7 @@ fn test_calculate_data() {
 }
 #[test]
 fn test_data_buffer() {
-    assert_eq!(DEFAULT_DATA_BUFFER.len_items(), 100);
+    assert_eq!(DEFAULT_DATA_BUFFER.len(), 100);
     let data = DEFAULT_DATA_BUFFER.last();
     asserts_data!(data);
 }
@@ -110,7 +110,7 @@ fn test_open_binaries() {
         Err(err) => panic!("ERROR: {err}"),
     };
 
-    assert_eq!(buffer_data.len_items(), 100);
+    assert_eq!(buffer_data.len(), 100);
     let data = buffer_data.last();
     asserts_data!(data);
 }
@@ -137,7 +137,7 @@ fn test_open_csv() {
         Ok(k) => k,
         Err(err) => panic!("ERROR: {err}"),
     };
-    assert_eq!(buffer_data.len_items(), 100);
+    assert_eq!(buffer_data.len(), 100);
     let data = buffer_data.last();
     asserts_data!(data, 0.0);
 }
@@ -163,7 +163,7 @@ fn test_open_excel() {
         Ok(k) => k,
         Err(err) => panic!("ERROR: {err}"),
     };
-    assert_eq!(buffer_data.len_items(), 100);
+    assert_eq!(buffer_data.len(), 100);
     let data = buffer_data.last();
     asserts_data!(data, 0.0);
 }

@@ -2,28 +2,37 @@ use std::cmp::Ordering;
 
 use crate::{Numeric as _, SafeMath as _};
 
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "use_serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct ValIdx<T: crate::Numeric> {
-    pub index: usize,
+    pub index: f64,
     pub value: T,
 }
 
 impl<T: crate::Numeric> ValIdx<T> {
     #[inline]
-    fn new(index: usize, value: impl Into<T>) -> Self {
+    fn new(index: f64, value: impl Into<T>) -> Self {
         Self {
             index,
             value: value.into(),
         }
     }
 }
-
-impl<T: crate::Numeric> From<[T; 2]> for ValIdx<T> {
+impl From<[f32; 2]> for ValIdx<f32> {
     #[inline(always)]
-    fn from(value: [T; 2]) -> Self {
+    fn from(value: [f32; 2]) -> Self {
         Self {
-            index: value[0].to_u32() as _,
+            index: value[0].to_f64(),
+            value: value[1],
+        }
+    }
+}
+
+impl From<[f64; 2]> for ValIdx<f64> {
+    #[inline(always)]
+    fn from(value: [f64; 2]) -> Self {
+        Self {
+            index: value[0],
             value: value[1],
         }
     }
@@ -66,7 +75,7 @@ where
 
     #[inline(always)]
     pub fn push_value(&mut self, value: T) {
-        let val = ValIdx::new(self.len(), value);
+        let val = ValIdx::new(self.len() as _, value);
         self.push(val)
     }
 
@@ -111,12 +120,7 @@ where
     }
 
     #[inline(always)]
-    pub fn into_points<Out>(&self) -> Out
-    where
-        Out: FromIterator<[crate::Float; 2]>,
-    {
-        self.iter()
-            .map(|y| [y.index.to_float(), y.value.to_float()])
-            .collect()
+    pub fn into_points<Out: FromIterator<[f64; 2]>>(&self) -> Out {
+        FromIterator::from_iter(self.iter().map(|y| [y.index, y.value.to_f64()]))
     }
 }

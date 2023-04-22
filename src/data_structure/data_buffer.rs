@@ -107,7 +107,7 @@ impl BufferData {
     }
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.len_items() == 0
+        self.len() == 0
     }
 
     #[inline]
@@ -148,25 +148,15 @@ impl BufferData {
             time_stamp,
         }
     }
-    pub fn len_items(&self) -> usize {
-        [
-            self.len,
-            self.speed.len(),
-            self.rpm.len(),
-            self.torque.len(),
-            self.horsepower.len(),
-            self.temp.len(),
-            self.time_stamp.len(),
-        ]
-        .into_iter()
-        .min()
-        .unwrap_or_default()
+    #[inline(always)]
+    pub fn len(&self) -> usize {
+        self.len
     }
 
     #[inline(always)]
     pub fn get_points<Out>(&self, idx: usize) -> Out
     where
-        Out: FromIterator<[crate::Float; 2]>,
+        Out: FromIterator<[f64; 2]>,
     {
         self[idx].into_points()
     }
@@ -229,7 +219,7 @@ impl BufferData {
 
     pub fn save_as_csv<P: AsRef<Path>>(&self, path: P) -> crate::DynoResult<()> {
         let mut writer = BufWriter::new(File::create(path)?);
-        let len = self.len_items();
+        let len = self.len();
         writeln!(&mut writer, "SPEED,RPM,TORQUE,HORSEPOWER,TEMP,TIME")?;
         for idx in 0usize..len {
             writeln!(
@@ -305,7 +295,7 @@ impl BufferData {
             ws.write_string_with_format(0, col as _, Self::BUFFER_NAME[col], &format_header)?;
             match col {
                 0..=4 => self[col].iter().for_each(|ValIdx { index, value }| {
-                    if let Err(err) = ws.write_number((index + 1) as _, col as _, *value) {
+                    if let Err(err) = ws.write_number((index + 1.) as _, col as _, *value) {
                         log::error!("{err}")
                     }
                 }),
@@ -316,7 +306,7 @@ impl BufferData {
                         None => Default::default(),
                     };
                     if let Err(err) =
-                        ws.write_datetime((index + 1) as _, col as _, &date_time, &date_format)
+                        ws.write_datetime((index + 1.) as _, col as _, &date_time, &date_format)
                     {
                         log::error!("{err}")
                     }
