@@ -17,15 +17,10 @@ lazy_static::lazy_static! {
 }
 
 trait DynoLoggerInner: Send + 'static {
-    fn log(&mut self, record: &Record);
+    fn log(&mut self, level: Level, record: String);
     fn flush(&mut self);
 
-    fn roll(&mut self) -> bool {
-        false
-    }
-    fn renew(&mut self) -> DynoResult<'static, ()> {
-        Ok(())
-    }
+    fn roll(&mut self) {}
 }
 
 pub struct DynoLogger {
@@ -62,17 +57,23 @@ impl Log for DynoLogger {
     #[inline]
     fn log(&self, record: &Record) {
         if let Ok(mut inner) = self.inner.lock() {
-            if inner.roll() {
-                match inner.renew() {
-                    Ok(()) => {}
-                    Err(err) => {
-                        eprintln!("ERROR: {err}");
-                        unreachable!()
-                    }
-                }
+            inner.roll();
+            let level = record.level();
+            let target = record.metadata().target();
+            let args = record.args();
+            inner.log(
+                level,
+                format!(
+                    "[{}]::[{}]::[{:6} - {}]\n",
+                    chrono::Utc::now().format("%v - %T"),
+                    target,
+                    level,
+                    args,
+                ),
+            );
+            if let Ok(mut locked) = RECORDS_LOGGER.lock() {
+                locked.push((level, format!("[{}]::[{:6}] - {}", target, level, args)));
             }
-            inner.log(record);
-            inner.flush();
         }
     }
 
@@ -85,28 +86,17 @@ impl Log for DynoLogger {
 }
 
 struct ConsoleLogger {
-    sink: BufWriter<Stderr>,
+    sink: Stderr,
 }
 impl ConsoleLogger {
     fn new() -> Self {
-        Self {
-            sink: BufWriter::new(io::stderr()),
-        }
+        Self { sink: io::stderr() }
     }
 }
 
 impl DynoLoggerInner for ConsoleLogger {
-    fn log(&mut self, record: &Record) {
-        let level = record.level();
-        writeln!(
-            &mut self.sink,
-            "[{}]:[{}]:{:6} - {}",
-            chrono::Utc::now().format("%+"),
-            record.metadata().target(),
-            level,
-            record.args()
-        )
-        .ok();
+    fn log(&mut self, _level: Level, record: String) {
+        self.sink.lock().write(record.as_bytes()).ok();
     }
 
     fn flush(&mut self) {
@@ -147,14 +137,14 @@ struct FileLogger<W: io::Write + Send + 'static> {
     #[allow(dead_code)]
     file: PathBuf,
     sink: BufWriter<W>,
-    action: RollAction,
+    action: FileAction,
     last_access: SystemTime,
     max_len: usize,
     len: usize,
 }
 
 impl FileLogger<File> {
-    fn new(file: PathBuf, action: RollAction, max_len: usize) -> DynoResult<'static, Self> {
+    fn new(file: PathBuf, action: FileAction, max_len: usize) -> DynoResult<'static, Self> {
         let fp = open_file(&file)?;
         let metadata = fp.metadata().map_err(|err| {
             DynoErr::filesistem_error(format!(
@@ -183,22 +173,10 @@ impl FileLogger<File> {
 }
 
 impl DynoLoggerInner for FileLogger<File> {
-    fn log(&mut self, record: &Record) {
-        let level = record.level();
-        let record_string = format!(
-            "[{}]:[{}]:{:6} - {}\n",
-            chrono::Utc::now().format("%+"),
-            record.metadata().target(),
-            level,
-            record.args()
-        );
-        match self.sink.write(record_string.as_bytes()) {
+    fn log(&mut self, _level: Level, record: String) {
+        match self.sink.write(record.as_bytes()) {
             Ok(k) => self.len += k,
             Err(_err) => {}
-        }
-
-        if let Ok(mut locked) = RECORDS_LOGGER.lock() {
-            locked.push((level, record_string));
         }
     }
 
@@ -207,13 +185,13 @@ impl DynoLoggerInner for FileLogger<File> {
         self.sink.flush().ok();
     }
 
-    fn roll(&mut self) -> bool {
+    fn roll(&mut self) {
         if self.len <= self.max_len {
-            return false;
+            return;
         }
-        match self.action {
-            RollAction::Noop => false,
-            RollAction::Roll => {
+        let rolled = match self.action {
+            FileAction::Noop => return,
+            FileAction::Roll => {
                 let mut file = self.file.clone();
                 file.set_extension(format!(
                     "log.{}.bak",
@@ -222,32 +200,31 @@ impl DynoLoggerInner for FileLogger<File> {
                 // guaranteed self.file is exists, its ok to ignore error
                 if std::fs::rename(&self.file, file).is_ok() {
                     self.len = 0;
-                    return true;
+                    true
+                } else {
+                    false
                 }
-                false
             }
-            RollAction::Delete => {
+            FileAction::Delete => {
                 let mut ret = true;
-                let renamed = self.file.with_extension("log.bak");
+                let mut renamed = self.file.clone();
+                renamed.set_extension("log.bak");
                 if renamed.exists() {
-                    ret = std::fs::remove_file(&renamed).is_err();
+                    ret = std::fs::remove_file(&renamed).is_ok();
                 }
-                if std::fs::rename(&self.file, renamed).is_ok() {
-                    ret = true;
-                }
-                ret
+                std::fs::rename(&self.file, renamed).is_ok() && ret
+            }
+        };
+        if rolled {
+            if let Ok(other) = Self::new(self.file.clone(), self.action, self.max_len) {
+                *self = other;
             }
         }
-    }
-
-    fn renew(&mut self) -> DynoResult<'static, ()> {
-        *self = Self::new(self.file.clone(), self.action, self.max_len)?;
-        Ok(())
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum RollAction {
+pub enum FileAction {
     #[default]
     /// do nothing, keep appending log in file
     Noop,
@@ -263,7 +240,7 @@ const SIZE_TRIGGER_ROLLING_FILE: usize = 10 * 1024 * 1024; // 50Mb
 pub struct LoggerBuilder {
     file: PathBuf,
     max_level: LevelFilter,
-    roll_action: RollAction,
+    roll_action: FileAction,
     max_size: usize,
 }
 impl Default for LoggerBuilder {
@@ -271,7 +248,7 @@ impl Default for LoggerBuilder {
         Self {
             file: std::env::temp_dir().join("dynotest/log.log"),
             max_level: LevelFilter::Warn,
-            roll_action: RollAction::Roll,
+            roll_action: FileAction::Roll,
             max_size: SIZE_TRIGGER_ROLLING_FILE,
         }
     }
@@ -290,7 +267,7 @@ impl LoggerBuilder {
         self.max_level = level.into();
         self
     }
-    pub fn set_roll_action(mut self, action: RollAction) -> Self {
+    pub fn set_roll_action(mut self, action: FileAction) -> Self {
         self.roll_action = action;
         self
     }
@@ -326,19 +303,3 @@ impl LoggerBuilder {
         })
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     #[test]
-//     fn test_init_file_logger() {
-//         let log_file = PathBuf::from(concat!(
-//             env!("CARGO_MANIFEST_DIR"),
-//             "/tests/files/test_log.log"
-//         ));
-//         match LoggerBuilder::new().set_file(log_file).set_max_level(LevelFilter::Trace).build_file_logger() {
-//             Ok(k) => k,
-//             Err(err) => panic!("ERROR: Failed to build file logger - {err}"),
-//         }
-//     }
-// }

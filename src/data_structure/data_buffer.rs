@@ -64,6 +64,16 @@ impl Data {
             horsepower,
         }
     }
+
+    pub fn time_duration_formatted(&self, start: chrono::NaiveTime) -> String {
+        let dur = self.time_stamp.time() - start;
+        format!(
+            "{:2}:{:2}:{:2}",
+            dur.num_hours(),
+            dur.num_minutes(),
+            dur.num_seconds()
+        )
+    }
 }
 
 #[derive(Clone, Default)]
@@ -107,7 +117,7 @@ impl BufferData {
     }
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.len == 0
     }
 
     #[inline]
