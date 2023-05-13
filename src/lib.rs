@@ -32,9 +32,6 @@ pub use chrono;
 #[cfg(feature = "use_log")]
 pub use log;
 
-#[cfg(feature = "use_once_cell")]
-pub use once_cell;
-
 #[cfg(feature = "use_regex")]
 pub use regex;
 
