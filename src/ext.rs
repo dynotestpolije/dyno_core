@@ -6,20 +6,39 @@ use std::{
 pub trait FloatMath {
     type Output;
     const DC: super::Float = 10.0;
+
+    /// # rounding floating point number in specified decimal digit place
+    /// ```
+    /// use dyno_types::FloatMath;
+    /// let value = 69.6969.round_decimal(2);
+    /// assert_eq!(value, 69.70);
+    /// ```
     fn round_decimal(self, decimal: i32) -> Self::Output;
 }
 impl FloatMath for super::Float {
     type Output = super::Float;
 
     fn round_decimal(self, decimal: i32) -> Self::Output {
-        let dp = crate::Float::powi(Self::DC, decimal);
-        crate::Float::trunc(self * dp) / dp
+        let factor = crate::Float::powi(Self::DC, decimal);
+        crate::Float::round(self * factor) / factor
     }
 }
 
 pub trait SafeMath {
     type Output;
     type Rhs;
+    /// # interface for save way to devide beetween numbers
+    /// ```
+    /// use dyno_types::SafeMath;
+    ///
+    /// let is_safe_value = 10.0.safe_div(2.0);
+    /// let is_not_safe_value = 10.0.safe_div(f64::NAN);
+    /// let devide_by_zero = 10.0.safe_div(0.0);
+    ///
+    /// assert_eq!(is_safe_value, Some(5.0));
+    /// assert_eq!(is_not_safe_value, None);
+    /// assert_eq!(devide_by_zero, None);
+    /// ```
     fn safe_div(self, rhs: Self::Rhs) -> Self::Output;
 }
 

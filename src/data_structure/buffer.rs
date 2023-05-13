@@ -2,8 +2,7 @@ use std::cmp::Ordering;
 
 use crate::{Numeric as _, SafeMath as _};
 
-#[derive(Clone, Copy, PartialEq, Default)]
-#[cfg_attr(feature = "use_serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Default, serde::Deserialize, serde::Serialize)]
 pub struct ValIdx<T: crate::Numeric> {
     pub index: f64,
     pub value: T,
@@ -39,8 +38,7 @@ impl From<[f64; 2]> for ValIdx<f64> {
 }
 
 pub const MAX_CAP_BUFFER: usize = 30_000;
-#[derive(Clone)]
-#[cfg_attr(feature = "use_serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Buffer<T: crate::Numeric>(Vec<ValIdx<T>>);
 
 impl<T: crate::Numeric> std::ops::Deref for Buffer<T> {

@@ -1,13 +1,11 @@
-#[cfg_attr(feature = "use_serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct UsersResponse {
     pub id: i32,
     pub nim: String,
     pub email: Option<String>,
 }
 
-#[cfg_attr(feature = "use_serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct SessionResponse {
     pub id: i32,
     pub session_verifier: String,

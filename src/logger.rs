@@ -280,12 +280,8 @@ impl LoggerBuilder {
         LOGGER.renew(Box::new(ConsoleLogger::new()))?;
 
         log::set_max_level(self.max_level);
-        log::set_logger(&*LOGGER).map_err(|err| {
-            crate::DynoErr::new(
-                format!("Failed to set logger - {err}"),
-                crate::ErrKind::AnyError,
-            )
-        })
+        log::set_logger(&*LOGGER)
+            .map_err(|err| crate::DynoErr::any_error(format!("Failed to set logger - {err}")))
     }
 
     pub fn build_file_logger(self) -> DynoResult<'static, ()> {
@@ -295,11 +291,7 @@ impl LoggerBuilder {
         let file_logger = FileLogger::new(self.file, self.roll_action, self.max_size)?;
         LOGGER.renew(Box::new(file_logger));
         log::set_max_level(self.max_level);
-        log::set_logger(&*LOGGER).map_err(|err| {
-            crate::DynoErr::new(
-                format!("Failed to set logger - {err}"),
-                crate::ErrKind::AnyError,
-            )
-        })
+        log::set_logger(&*LOGGER)
+            .map_err(|err| crate::DynoErr::any_error(format!("Failed to set logger - {err}")))
     }
 }

@@ -13,7 +13,7 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default     = ["use_log", "use_serde", "use_chrono", "use_excel", "bigger_float"]
+default     = ["use_log", "use_chrono", "use_excel", "bigger_float", "backend", "frontend"]
 
 backend         = ["dep:actix-web"]
 frontend        = ["dep:reqwest"]
@@ -21,25 +21,25 @@ use_log         = ["dep:log"]
 use_excel       = ["dep:calamine", "dep:rust_xlsxwriter"]
 use_regex       = ["dep:regex"]
 use_chrono      = ["dep:chrono"]
-use_serde       = ["dep:serde", "dep:bincode", "dep:derive_more", "dep:serde_json", "dep:toml"]
+use_bincode     = []
 bigger_float    = []
 
 [dependencies]
-chrono      = { optional = true, version = "0.4", features = ["serde"]}
-toml        = { optional = true, version = "0.7" }
-bincode     = { optional = true, version = "1" }
-serde_json  = { optional = true, version = "1" }
-derive_more = { optional = true, version = "0.99" }
-serde       = { optional = true, version = "1", features = ["derive"] }
+derive_more = { version = "0.99" }
+toml        = { version = "0.7" }
+bincode     = { version = "1" }
+serde_json  = { version = "1" }
+serde       = { version = "1", features = ["derive"] }
 
+chrono      = { optional = true, version = "0.4", features = ["serde"]}
 log         = { optional = true, version = "0.4" }
-regex       = { optional = true, version = "1.7" } # For checking if we need to skip auth
+regex       = { optional = true, version = "1" } # For checking if we need to skip auth
 
 reqwest     = { optional = true, version = "0.11.14", features = ["json", "blocking", "rustls"], default-features = false }
 
 # umya-spreadsheet = { optional = true, version = "0.9.0" }
 calamine            = { optional = true, version = "0.19", features = ["dates"] }
-rust_xlsxwriter     = { optional = true, version = "0.32" }
+rust_xlsxwriter     = { optional = true, version = "0.38.0" }
 paste = "1.0.12"
 lazy_static = "1.4.0"
 

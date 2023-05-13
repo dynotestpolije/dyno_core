@@ -1,9 +1,8 @@
 use std::path::PathBuf;
 
 use dyno_types::{
-    convertions::temperature::Celcius,
+    convertions::prelude::*,
     data_buffer::{BufferData, Data},
-    infomotor::{Cylinder, InfoMotor, Stroke, Transmition},
     FloatMath, Numeric, SerialData,
 };
 use lazy_static::lazy_static;
@@ -15,71 +14,73 @@ const SER_DATA: SerialData = SerialData {
     pulse_encoder: 4200,
     pulse_rpm: 69,
     temperature: 420f32,
-};
-const INFO_MOTOR: InfoMotor = InfoMotor {
-    name: String::new(),
-    cc: 4,
-    cylinder: Cylinder::Single,
-    stroke: Stroke::Four,
-    transmition: Transmition::Manual(4),
-    tire_diameter: 16.0,
+    pulse_encoder_max: 360,
 };
 
 lazy_static! {
     static ref DEFAULT_DATA_BUFFER: BufferData = {
         let mut buffer = BufferData::new();
-        let data = Data::from_serial(&INFO_MOTOR, SER_DATA);
+        let data = Data::from_serial(buffer.last(), &CONFIG, SER_DATA);
         for _ in 0..100 {
             buffer.push_data(data.clone());
         }
         buffer
     };
+    static ref CONFIG: dyno_types::DynoConfig = dyno_types::DynoConfig::default();
 }
 
 macro_rules! asserts_data {
     ($data: ident, $odo: literal) => {{
-        assert_eq!($data.rpm.to_float().round(), 20700., "data rpm asserts");
+        assert_eq!($data.rpm.to_float().round(), 41400., "data rpm asserts");
         assert_eq!(
-            $data.odo.to_float().round_decimal(2),
+            $data.odo.to_float().round_decimal(4),
             $odo,
             "data odo asserts"
         );
         assert_eq!(
             $data.speed.to_float().round_decimal(2),
-            105.55,
+            88.45,
             "data speed asserts"
         );
         assert_eq!($data.temp, Celcius::new(420.), "data temp asserts");
 
         // TODO: torque and horsepower implementation
-        assert_eq!($data.torque, 0.0);
-        assert_eq!($data.horsepower, 0.0);
+        assert_eq!($data.torque.round_decimal(2), 569.02, "data torque asserts");
+        assert_eq!(
+            $data.horsepower.round_decimal(1),
+            2467.0,
+            "data horsepower asserts"
+        );
     }};
 
     ($data: ident) => {
-        asserts_data!($data, 0.58)
+        asserts_data!($data, 0.0049)
     };
 }
 
 #[test]
 fn test_calculate_data() {
-    let data = Data::from_serial(&INFO_MOTOR, SER_DATA);
-    assert_eq!(data.rpm.to_float().round(), 20700., "data rpm asserts");
+    let data = DEFAULT_DATA_BUFFER.last();
+    assert_eq!(data.rpm.value().round(), 41400., "data rpm asserts");
     assert_eq!(
         data.odo.to_float().round_decimal(4),
-        0.0058,
+        0.0049,
         "data odo asserts"
     );
     assert_eq!(
         data.speed.to_float().round_decimal(2),
-        105.55,
+        88.45,
         "data speed asserts"
     );
     assert_eq!(data.temp, Celcius::new(420.), "data temp asserts");
 
     // TODO: torque and horsepower implementation
-    assert_eq!(data.torque, 0.0);
-    assert_eq!(data.horsepower, 0.0);
+    assert_eq!(data.torque.round_decimal(2), 569.02, "data torque asserts");
+    assert_eq!(
+        data.horsepower.round_decimal(2),
+        2467.0,
+        "data horsepower asserts"
+    );
 }
 #[test]
 fn test_data_buffer() {

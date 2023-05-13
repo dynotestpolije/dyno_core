@@ -5,12 +5,10 @@ use dyno_types::{convertions::prelude::*, *};
 #[test]
 fn test_tick_around() {
     let full_revolution = 360.0;
-    let tick: CentiMetres = (10000f64 / full_revolution).araund(18.0);
-    let m = tick.to_metres();
-    let km = tick.to_kilometres();
-    assert_eq!(tick.round_decimal(2), 1570.79, "odo in Cm");
+    let m: Metres = (10000f64 / full_revolution).araund(0.18.into());
+    assert_eq!(m.to_centimetres().round_decimal(2), 1570.79, "odo in Cm");
     assert_eq!(m.round_decimal(2), 15.7, "odo in Meter");
-    assert_eq!(km.round_decimal(2), 0.01, "odo in KiloMeter");
+    assert_eq!(m.to_kilometres().round_decimal(2), 0.01, "odo in KiloMeter");
 }
 #[test]
 fn test_angular_velocity() {
@@ -40,7 +38,7 @@ fn test_angular_velocity() {
 fn test_velocity() {
     let delta_time = 0.1f64;
     let full_revolution = 360.0;
-    let odo: Metres = (10000f64 / full_revolution).araund(18.0).to_metres();
+    let odo: Metres = (10000f64 / full_revolution).araund(0.18.into());
     //      s = d / t
     //
     // - s : speed ( kecepatan )
@@ -54,19 +52,18 @@ fn test_velocity() {
 }
 #[test]
 fn test_acceleration() {
-    let delta_time = 0.1f64;
+    let delta_time = 100f64;
     let v0 = 0.0;
     let full_revolution = 360.0;
-    let odo = (10000f64 / full_revolution).araund(18.0).to_metres();
-    let velocity: MetresPerSecond = odo
-        .safe_div(delta_time)
-        .map_or(Default::default(), MetresPerSecond::new);
+    let odo = (10000f64 / full_revolution).araund(0.18.into());
+    let velocity = MetresPerSecond::from_ms(odo, delta_time);
+
     // acceleration =  Δv / Δt;
     // acceleration = (v1 - v0) / Δt;
     // acceleration = (velocity - 0) / delta  => contoh
     //                                   (v01        - v0) / Δt
     let delta_v = velocity - v0;
-    let acceleration = delta_v / delta_time;
+    let acceleration = delta_v.per_second(delta_time);
     assert_eq!(
         acceleration.round_decimal(2),
         1570.79,
@@ -77,7 +74,7 @@ fn test_acceleration() {
 #[test]
 fn test_round_decimal() {
     const VALUE: f64 = 69.69696969;
-    assert_eq!(VALUE.round_decimal(2), 69.69);
-    assert_eq!(VALUE.round_decimal(4), 69.6969);
-    assert_eq!(VALUE.round_decimal(6), 69.696969);
+    assert_eq!(VALUE.round_decimal(2), 69.7);
+    assert_eq!(VALUE.round_decimal(4), 69.697);
+    assert_eq!(VALUE.round_decimal(6), 69.69697);
 }

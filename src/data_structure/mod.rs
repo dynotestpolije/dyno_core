@@ -3,16 +3,13 @@ pub mod data_buffer;
 pub mod infomotor;
 
 #[repr(C)]
-#[derive(Debug, Default, Clone, Copy)]
-#[cfg_attr(
-    feature = "use_serde",
-    derive(serde::Deserialize, derive_more::Display),
-    display(
-        fmt = "time(ms): {time}, enc(pulse): {pulse_encoder}, rpm(pulse): {pulse_rpm}, temp(celcius): {temperature:.2}"
-    )
+#[derive(Debug, Default, Clone, Copy, serde::Deserialize, derive_more::Display)]
+#[display(
+    fmt = "time(ms): {time}, enc(pulse): {pulse_encoder}, rpm(pulse): {pulse_rpm}, temp(celcius): {temperature:.2}"
 )]
 pub struct SerialData {
     pub time: u32, // in ms
+    pub pulse_encoder_max: u32,
     pub pulse_encoder: u32,
     pub pulse_rpm: u32,
     pub temperature: f32,

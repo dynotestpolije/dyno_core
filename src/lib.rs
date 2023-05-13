@@ -1,29 +1,30 @@
 #![allow(unused_comparisons)]
 
+mod config;
 mod data_structure;
 mod error;
 mod ext;
 mod logger;
 mod macros;
+mod validator;
 
 pub mod convertions;
 
+pub use config::*;
 pub use data_structure::*;
 pub use error::*;
 pub use ext::*;
 pub use logger::*;
+pub use validator::*;
+
+pub use bincode;
+pub use derive_more;
+pub use serde;
+pub use serde_json;
+pub use toml;
 
 #[cfg(any(feature = "backend", feature = "frontend"))]
 pub mod server;
-
-#[cfg(feature = "use_serde")]
-pub use bincode;
-#[cfg(feature = "use_serde")]
-pub use derive_more;
-#[cfg(feature = "use_serde")]
-pub use serde_json;
-#[cfg(feature = "use_serde")]
-pub use toml;
 
 #[cfg(feature = "use_chrono")]
 pub use chrono;
@@ -47,6 +48,7 @@ pub use paste;
 pub mod float {
     #[cfg(not(feature = "bigger_float"))]
     pub use std::f32::*;
+
     #[cfg(feature = "bigger_float")]
     pub use std::f64::*;
 }
@@ -55,6 +57,7 @@ pub mod float {
 pub type Float = f64;
 #[cfg(feature = "bigger_float")]
 pub const PI: Float = float::consts::PI;
+pub const GRAVITY_SPEED: Float = 9.806_65;
 
 #[cfg(not(feature = "bigger_float"))]
 pub type Float = f32;
@@ -80,6 +83,17 @@ macro_rules! decl_constants {
     );
 }
 
+#[macro_export]
+macro_rules! ternary {
+    (($logic:expr) ? ($trues:expr) : ($falsies:expr)) => {
+        if $logic {
+            $trues
+        } else {
+            $falsies
+        }
+    };
+}
+
 pub trait ResultHandler<'err, T, E> {
     fn dyn_err(self) -> DynoResult<'err, T>;
 }
@@ -95,13 +109,4 @@ where
             Err(err) => Err(DynoErr::from(err)),
         }
     }
-}
-
-#[macro_export]
-macro_rules! validate_error {
-    ($($args:tt)*) => (Err($crate::DynoErr::new(format!($($args)*), $crate::ErrKind::ValidateError)));
-}
-
-pub trait Validate: Sized + std::fmt::Display {
-    fn validate(&self) -> DynoResult<'_, ()>;
 }
