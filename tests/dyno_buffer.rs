@@ -1,4 +1,4 @@
-use dyno_types::*;
+use dyno_core::*;
 
 type Buffer = buffer::Buffer<Float>;
 lazy_static::lazy_static! {

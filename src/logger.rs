@@ -38,7 +38,7 @@ impl Default for DynoLogger {
 impl DynoLogger {
     // Set this `SimpleLogger`'s sink and reset the start time.
     #[allow(unused)]
-    fn renew(&self, inner: Box<dyn DynoLoggerInner>) -> DynoResult<'_, ()> {
+    fn renew(&self, inner: Box<dyn DynoLoggerInner>) -> DynoResult<()> {
         let mut lock = self
             .inner
             .lock()
@@ -104,7 +104,7 @@ impl DynoLoggerInner for ConsoleLogger {
     }
 }
 
-fn open_file<P: AsRef<Path>>(file: P) -> DynoResult<'static, File> {
+fn open_file<P: AsRef<Path>>(file: P) -> DynoResult<File> {
     let file = file.as_ref();
     std::fs::OpenOptions::new()
         .write(true)
@@ -112,12 +112,7 @@ fn open_file<P: AsRef<Path>>(file: P) -> DynoResult<'static, File> {
         .truncate(false)
         .create(true)
         .open(file)
-        .map_err(|err| {
-            DynoErr::filesistem_error(format!(
-                "ERROR: Failed to open file '{}' - {err}",
-                file.display()
-            ))
-        })
+        .map_err(DynoErr::filesistem_error)
 }
 
 #[inline]
@@ -144,21 +139,10 @@ struct FileLogger<W: io::Write + Send + 'static> {
 }
 
 impl FileLogger<File> {
-    fn new(file: PathBuf, action: FileAction, max_len: usize) -> DynoResult<'static, Self> {
+    fn new(file: PathBuf, action: FileAction, max_len: usize) -> DynoResult<Self> {
         let fp = open_file(&file)?;
-        let metadata = fp.metadata().map_err(|err| {
-            DynoErr::filesistem_error(format!(
-                "Failed accessing metadata for file {} - {err}",
-                file.display()
-            ))
-        })?;
-
-        let last_access = metadata.modified().map_err(|err| {
-            DynoErr::filesistem_error(format!(
-                "Failed to get time modified info file {} - {err}",
-                file.display()
-            ))
-        })?;
+        let metadata = fp.metadata().map_err(DynoErr::filesistem_error)?;
+        let last_access = metadata.modified().map_err(DynoErr::filesistem_error)?;
 
         let len = metadata.len() as usize;
         Ok(Self {
@@ -276,30 +260,20 @@ impl LoggerBuilder {
         self
     }
 
-    pub fn build_console_logger(self) -> DynoResult<'static, ()> {
+    pub fn build_console_logger(self) -> DynoResult<()> {
         LOGGER.renew(Box::new(ConsoleLogger::new()))?;
 
         log::set_max_level(self.max_level);
-        log::set_logger(&*LOGGER).map_err(|err| {
-            crate::DynoErr::new(
-                format!("Failed to set logger - {err}"),
-                crate::ErrKind::AnyError,
-            )
-        })
+        log::set_logger(&*LOGGER).map_err(DynoErr::logger_error)
     }
 
-    pub fn build_file_logger(self) -> DynoResult<'static, ()> {
+    pub fn build_file_logger(self) -> DynoResult<()> {
         if let Some(parent) = self.file.parent() {
             std::fs::create_dir_all(parent)?;
         }
         let file_logger = FileLogger::new(self.file, self.roll_action, self.max_size)?;
         LOGGER.renew(Box::new(file_logger));
         log::set_max_level(self.max_level);
-        log::set_logger(&*LOGGER).map_err(|err| {
-            crate::DynoErr::new(
-                format!("Failed to set logger - {err}"),
-                crate::ErrKind::AnyError,
-            )
-        })
+        log::set_logger(&*LOGGER).map_err(DynoErr::logger_error)
     }
 }

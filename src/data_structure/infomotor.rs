@@ -1,5 +1,15 @@
-#[cfg_attr(feature = "use_serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    serde::Deserialize,
+    serde::Serialize,
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+)]
 pub enum Stroke {
     Unknown = 0,
     Two = 2,
@@ -35,8 +45,18 @@ impl From<u8> for Stroke {
     }
 }
 
-#[cfg_attr(feature = "use_serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    serde::Deserialize,
+    serde::Serialize,
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+)]
 pub enum Transmition {
     Unknown,
     #[default]
@@ -70,9 +90,21 @@ impl From<u8> for Transmition {
     }
 }
 
-#[cfg_attr(feature = "use_serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u32)]
+#[derive(
+    serde::Deserialize,
+    serde::Serialize,
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+)]
 pub enum Cylinder {
+    Unknown = 0,
     #[default]
     Single,
     Two,
@@ -80,10 +112,12 @@ pub enum Cylinder {
     Four,
     Six,
     Eight,
-    Unknown,
 }
 
 impl Cylinder {
+    pub fn not_unkown(self) -> bool {
+        !matches!(self, Self::Unknown)
+    }
     pub fn into_iter() -> impl Iterator<Item = Self> {
         [
             Self::Single,
@@ -125,18 +159,51 @@ impl From<u8> for Cylinder {
     }
 }
 
-use crate::{DynoErr, ResultHandler};
+#[derive(Debug, Clone, derive_more::Display, serde::Deserialize, serde::Serialize)]
+pub enum MotorType {
+    Electric(ElectricMotor),
+    Engine(InfoMotor),
+}
 
-#[derive(Debug, Clone, derive_more::Display)]
-#[cfg_attr(feature = "use_serde", derive(serde::Deserialize, serde::Serialize))]
-#[display(fmt = "`{name}` - |`{cc}`|`{cylinder}`|`{stroke}`|`{transmition}`|`{tire_diameter}`|")]
+impl Default for MotorType {
+    fn default() -> Self {
+        Self::Engine(InfoMotor::default())
+    }
+}
+
+impl MotorType {
+    pub fn is_electric(self) -> bool {
+        matches!(self, Self::Electric(_))
+    }
+
+    pub fn is_engine(self) -> bool {
+        matches!(self, Self::Engine(_))
+    }
+}
+
+#[derive(Debug, Clone, derive_more::Display, serde::Deserialize, serde::Serialize)]
+#[display(fmt = "[name: {name}]")]
+pub struct ElectricMotor {
+    pub name: String,
+}
+
+impl Default for ElectricMotor {
+    fn default() -> Self {
+        Self {
+            name: "Electric Motor Name".to_owned(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, derive_more::Display, serde::Deserialize, serde::Serialize)]
+#[display(fmt = "[{name} - {cc}|{cylinder}|{stroke}]")]
+#[serde(default)]
 pub struct InfoMotor {
     pub name: String,
     pub cc: u32,
     pub cylinder: Cylinder,
     pub stroke: Stroke,
     pub transmition: Transmition,
-    pub tire_diameter: crate::Float,
 }
 
 impl Default for InfoMotor {
@@ -147,7 +214,6 @@ impl Default for InfoMotor {
             cylinder: Cylinder::Single,
             stroke: Stroke::Four,
             transmition: Transmition::Manual(4),
-            tire_diameter: 16.0,
         }
     }
 }
@@ -155,18 +221,6 @@ impl Default for InfoMotor {
 impl InfoMotor {
     pub fn new() -> Self {
         Self::default()
-    }
-    pub fn from_config<'err, P: AsRef<std::path::Path>>(path: P) -> crate::DynoResult<'err, ()> {
-        let content = std::fs::read_to_string(path.as_ref())?;
-        match path
-            .as_ref()
-            .extension()
-            .map(|x| x.to_str().unwrap_or_default())
-        {
-            Some("toml") => toml::from_str(content.as_str()).dyn_err(),
-            Some("json") => serde_json::from_slice(content.as_bytes()).dyn_err(),
-            _ => Err(DynoErr::encoding_decoding_error("File type not supported")),
-        }
     }
 
     #[inline(always)]
@@ -196,12 +250,6 @@ impl InfoMotor {
     #[inline(always)]
     pub fn set_transmition(&mut self, transmition: impl Into<Transmition>) -> &mut Self {
         self.transmition = transmition.into();
-        self
-    }
-
-    #[inline(always)]
-    pub fn set_tire_diameter(&mut self, tire_diameter: impl Into<crate::Float>) -> &mut Self {
-        self.tire_diameter = tire_diameter.into();
         self
     }
 }

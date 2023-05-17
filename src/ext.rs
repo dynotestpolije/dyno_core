@@ -3,23 +3,46 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
+pub trait AsStr<'s> {
+    fn as_str(&self) -> &'s str;
+}
+
 pub trait FloatMath {
     type Output;
     const DC: super::Float = 10.0;
+
+    /// # rounding floating point number in specified decimal digit place
+    /// ```
+    /// use dyno_types::FloatMath;
+    /// let value = 69.6969.round_decimal(2);
+    /// assert_eq!(value, 69.70);
+    /// ```
     fn round_decimal(self, decimal: i32) -> Self::Output;
 }
 impl FloatMath for super::Float {
     type Output = super::Float;
 
     fn round_decimal(self, decimal: i32) -> Self::Output {
-        let dp = crate::Float::powi(Self::DC, decimal);
-        crate::Float::trunc(self * dp) / dp
+        let factor = crate::Float::powi(Self::DC, decimal);
+        crate::Float::round(self * factor) / factor
     }
 }
 
 pub trait SafeMath {
     type Output;
     type Rhs;
+    /// # interface for save way to devide beetween numbers
+    /// ```
+    /// use dyno_types::SafeMath;
+    ///
+    /// let is_safe_value = 10.0.safe_div(2.0);
+    /// let is_not_safe_value = 10.0.safe_div(f64::NAN);
+    /// let devide_by_zero = 10.0.safe_div(0.0);
+    ///
+    /// assert_eq!(is_safe_value, Some(5.0));
+    /// assert_eq!(is_not_safe_value, None);
+    /// assert_eq!(devide_by_zero, None);
+    /// ```
     fn safe_div(self, rhs: Self::Rhs) -> Self::Output;
 }
 
@@ -112,3 +135,60 @@ crate::macros::impl_numeric_integer!(i8 u8 i16 u16 i32 u32 i64 u64 isize usize);
 
 #[cfg(has_i128)]
 crate::macros::impl_numeric_integer!(i128);
+
+#[inline(always)]
+pub fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
+    unsafe {
+        ::core::slice::from_raw_parts((p as *const T) as *const u8, ::core::mem::size_of::<T>())
+    }
+}
+#[inline(always)]
+pub fn any_from_u8_slice<T: Sized>(b: &[u8]) -> T {
+    assert!(b.len() == ::core::mem::size_of::<T>());
+    unsafe { ::core::ptr::read::<T>(b.as_ptr() as *const T) }
+}
+
+pub trait BinSerializeDeserialize: Sized + serde::Serialize + serde::de::DeserializeOwned {
+    #[inline(always)]
+    fn serialize_bin(&self) -> crate::DynoResult<Vec<u8>> {
+        bincode::serialize(self).map_err(From::from)
+    }
+
+    #[inline(always)]
+    fn deserialize_bin(bin: &[u8]) -> crate::DynoResult<Self> {
+        bincode::deserialize(bin).map_err(From::from)
+    }
+
+    #[deprecated(note = "use the CompresedSaver impl or compress_to_file() instead")]
+    fn serialize_to_file<P: AsRef<std::path::Path>>(&self, path: P) -> crate::DynoResult<()> {
+        let data = self.serialize_bin()?;
+        std::fs::write(path, data).map_err(From::from)
+    }
+
+    #[deprecated(note = "use the CompresedSaver impl or decompress_from_file() instead")]
+    fn deserialize_from_file<P: AsRef<std::path::Path>>(path: P) -> crate::DynoResult<Self> {
+        let data = std::fs::read(path)?;
+        bincode::deserialize(&data).map_err(From::from)
+    }
+    // add code here
+}
+
+impl<T> BinSerializeDeserialize for T where T: Sized + serde::Serialize + serde::de::DeserializeOwned
+{}
+
+pub trait CompresedSaver: BinSerializeDeserialize {
+    fn compress_to_file<P: AsRef<std::path::Path>>(&self, path: P) -> crate::DynoResult<()> {
+        let serialized = self.serialize_bin()?;
+        let data = miniz_oxide::deflate::compress_to_vec(&serialized, 6);
+        std::fs::write(path, data).map_err(From::from)
+    }
+
+    fn decompress_from_file<P: AsRef<std::path::Path>>(path: P) -> crate::DynoResult<Self> {
+        let deserialized = std::fs::read(path)?;
+        let data = miniz_oxide::inflate::decompress_to_vec(&deserialized)
+            .map_err(crate::DynoErr::encoding_decoding_error)?;
+        bincode::deserialize(&data).map_err(From::from)
+    }
+}
+
+impl<T> CompresedSaver for T where T: BinSerializeDeserialize {}

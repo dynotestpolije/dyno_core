@@ -1,5 +1,5 @@
 [package]
-name = "dyno_types"
+name = "dyno_core"
 version = "0.1.0"
 authors = ["Rizal Achmad Pahlevi <rizal.ahmadp@gmail.com>"]
 edition = "2021"
@@ -13,37 +13,51 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default     = ["use_log", "use_serde", "use_chrono", "use_excel", "bigger_float"]
+default     = ["use_log", "use_chrono", "use_excel", "dep:uuid"]
 
-backend         = ["dep:actix-web"]
-frontend        = ["dep:reqwest"]
+backend         = ["dep:actix-web", "dep:sqlx"]
 use_log         = ["dep:log"]
 use_excel       = ["dep:calamine", "dep:rust_xlsxwriter"]
 use_regex       = ["dep:regex"]
 use_chrono      = ["dep:chrono"]
-use_serde       = ["dep:serde", "dep:bincode", "dep:derive_more", "dep:serde_json", "dep:toml"]
-bigger_float    = []
+use_bincode     = []
 
 [dependencies]
-chrono      = { optional = true, version = "0.4", features = ["serde"]}
-toml        = { optional = true, version = "0.7" }
-bincode     = { optional = true, version = "1" }
-serde_json  = { optional = true, version = "1" }
-derive_more = { optional = true, version = "0.99" }
-serde       = { optional = true, version = "1", features = ["derive"] }
+derive_more = { version = "^0.99" }
+toml        = { version = "^0.7" }
+serde_json  = { version = "^1.0" }
+paste       = { version = "^1.0" }
+lazy_static = { version = "^1.4" }
+serde       = { version = "^1.0", features = ["derive"] }
+bincode     = { version = "^1.3" }
+chrono      = { optional = true, version = "^0.4", features = ["serde"]}
+log         = { optional = true, version = "^0.4" }
+regex       = { optional = true, version = "^1.8" } # For checking if we need to skip auth
 
-log         = { optional = true, version = "0.4" }
-regex       = { optional = true, version = "1.7" } # For checking if we need to skip auth
-
-reqwest     = { optional = true, version = "0.11.14", features = ["json", "blocking", "rustls"], default-features = false }
+# reqwest     = { optional = true, version = "0.11.14", features = ["json", "blocking", "rustls"], default-features = false }
 
 # umya-spreadsheet = { optional = true, version = "0.9.0" }
-calamine            = { optional = true, version = "0.19", features = ["dates"] }
-rust_xlsxwriter     = { optional = true, version = "0.32" }
-paste = "1.0.12"
-lazy_static = "1.4.0"
+calamine            = { optional = true, version = "^0.19", features = ["dates"] }
+rust_xlsxwriter     = { optional = true, version = "^0.38" }
+miniz_oxide         = { version = "0.7.1", features = ["std"] }
 
 [dependencies.actix-web]
-version = "4"
+version = "^4.3"
 optional = true
-default-features = false
+
+[dependencies.sqlx]
+version = "^0.6"
+optional = true
+features = [
+    "runtime-async-std-native-tls",
+    "sqlite",
+    "chrono",
+    "offline",
+    "uuid"
+]
+
+[dependencies.uuid]
+version = "^1.3"
+optional = true
+features = ["serde", "v4"] 
+

@@ -1,134 +1,165 @@
 use std::path::PathBuf;
 
-use dyno_types::{
-    convertions::temperature::Celcius,
+use dyno_core::{
+    convertions::prelude::*,
     data_buffer::{BufferData, Data},
-    infomotor::{Cylinder, InfoMotor, Stroke, Transmition},
-    FloatMath, Numeric, SerialData,
+    CompresedSaver, FloatMath, Numeric, SerialData,
 };
 use lazy_static::lazy_static;
 
 const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
 const SER_DATA: SerialData = SerialData {
-    time: 200,
-    pulse_encoder: 4200,
+    time: 1000,
+    pulse_enc: 4200,
     pulse_rpm: 69,
     temperature: 420f32,
-};
-const INFO_MOTOR: InfoMotor = InfoMotor {
-    name: String::new(),
-    cc: 4,
-    cylinder: Cylinder::Single,
-    stroke: Stroke::Four,
-    transmition: Transmition::Manual(4),
-    tire_diameter: 16.0,
+    pulse_enc_max: 360,
+    period: 200,
+    pulse_enc_raw: 4200 / 4,
+    pulse_enc_z: 4200 / 360,
 };
 
 lazy_static! {
     static ref DEFAULT_DATA_BUFFER: BufferData = {
         let mut buffer = BufferData::new();
-        let data = Data::from_serial(&INFO_MOTOR, SER_DATA);
-        for _ in 0..100 {
+        let data = Data::from_serial(buffer.last(), &CONFIG, SER_DATA);
+        for _ in 0..10_000 {
             buffer.push_data(data.clone());
         }
         buffer
     };
+    static ref CONFIG: dyno_core::DynoConfig = dyno_core::DynoConfig::default();
 }
 
 macro_rules! asserts_data {
     ($data: ident, $odo: literal) => {{
-        assert_eq!($data.rpm.to_float().round(), 20700., "data rpm asserts");
+        assert_eq!($data.rpm.to_float().round(), 41400., "data rpm asserts");
         assert_eq!(
-            $data.odo.to_float().round_decimal(2),
+            $data.odo.to_float().round_decimal(4),
             $odo,
             "data odo asserts"
         );
         assert_eq!(
             $data.speed.to_float().round_decimal(2),
-            105.55,
+            88.45,
             "data speed asserts"
         );
         assert_eq!($data.temp, Celcius::new(420.), "data temp asserts");
 
         // TODO: torque and horsepower implementation
-        assert_eq!($data.torque, 0.0);
-        assert_eq!($data.horsepower, 0.0);
+        assert_eq!($data.torque.round_decimal(2), 569.02, "data torque asserts");
+        assert_eq!(
+            $data.horsepower.round_decimal(1),
+            2467.0,
+            "data horsepower asserts"
+        );
     }};
 
     ($data: ident) => {
-        asserts_data!($data, 0.58)
+        asserts_data!($data, 0.0049)
     };
 }
 
 #[test]
 fn test_calculate_data() {
-    let data = Data::from_serial(&INFO_MOTOR, SER_DATA);
-    assert_eq!(data.rpm.to_float().round(), 20700., "data rpm asserts");
+    let data = DEFAULT_DATA_BUFFER.last();
+    assert_eq!(data.rpm.value().round(), 41400., "data rpm asserts");
     assert_eq!(
         data.odo.to_float().round_decimal(4),
-        0.0058,
+        0.0049,
         "data odo asserts"
     );
     assert_eq!(
         data.speed.to_float().round_decimal(2),
-        105.55,
+        88.45,
         "data speed asserts"
     );
     assert_eq!(data.temp, Celcius::new(420.), "data temp asserts");
 
     // TODO: torque and horsepower implementation
-    assert_eq!(data.torque, 0.0);
-    assert_eq!(data.horsepower, 0.0);
+    assert_eq!(data.torque.round_decimal(2), 569.02, "data torque asserts");
+    assert_eq!(
+        data.horsepower.round_decimal(2),
+        2467.0,
+        "data horsepower asserts"
+    );
 }
 #[test]
 fn test_data_buffer() {
-    assert_eq!(DEFAULT_DATA_BUFFER.len(), 100);
+    assert_eq!(DEFAULT_DATA_BUFFER.len(), 10_000);
     let data = DEFAULT_DATA_BUFFER.last();
     asserts_data!(data);
 }
 
-#[test]
-fn test_save_binaries() {
-    let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.bin");
+// fn test_save_binaries() {
+//     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.bin");
+//     if !path.exists() {
+//         match DEFAULT_DATA_BUFFER.serialize_to_file(&path) {
+//             Ok(k) => k,
+//             Err(err) => panic!("ERROR: {err}"),
+//         }
+//     }
+//     assert!(path.is_file());
+// }
+// fn test_open_binaries() {
+//     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.bin");
+//     std::thread::sleep(std::time::Duration::from_secs(1));
+//     let buffer_data = match BufferData::deserialize_from_file(path) {
+//         Ok(ok) => ok,
+//         Err(err) => panic!("ERROR: {err}"),
+//     };
+
+//     assert_eq!(buffer_data.len(), 10_000);
+//     let data = buffer_data.last();
+//     asserts_data!(data);
+// }
+// #[test]
+// fn test_binaries_data_buffer() {
+//     test_save_binaries();
+//     test_open_binaries();
+// }
+
+fn test_save_compressed() {
+    let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.dyno");
     if !path.exists() {
-        match DEFAULT_DATA_BUFFER.serialize_to_file(&path) {
+        match DEFAULT_DATA_BUFFER.compress_to_file(&path) {
             Ok(k) => k,
             Err(err) => panic!("ERROR: {err}"),
         }
     }
-    assert!(path.exists());
     assert!(path.is_file());
 }
-#[test]
-fn test_open_binaries() {
-    let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.bin");
+fn test_open_compressed() {
+    let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.dyno");
     std::thread::sleep(std::time::Duration::from_secs(1));
-    assert!(path.exists());
-    let buffer_data = match BufferData::deserialize_from_file(path) {
+    let buffer_data = match BufferData::decompress_from_file(path) {
         Ok(ok) => ok,
         Err(err) => panic!("ERROR: {err}"),
     };
 
-    assert_eq!(buffer_data.len(), 100);
+    assert_eq!(buffer_data.len(), 10_000);
     let data = buffer_data.last();
     asserts_data!(data);
 }
-
 #[test]
+fn test_compressed_data_buffer() {
+    test_save_compressed();
+    test_open_compressed();
+}
+
 fn test_save_csv() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_csv.csv");
     if !path.exists() {
         match DEFAULT_DATA_BUFFER.save_as_csv(&path) {
             Ok(k) => k,
-            Err(err) => panic!("ERROR: {err}"),
+            Err(err) => panic!("{err}"),
         }
     }
     assert!(path.exists());
     assert!(path.is_file());
 }
 
-#[test]
 fn test_open_csv() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_csv.csv");
     std::thread::sleep(std::time::Duration::from_secs(1));
@@ -137,11 +168,17 @@ fn test_open_csv() {
         Ok(k) => k,
         Err(err) => panic!("ERROR: {err}"),
     };
-    assert_eq!(buffer_data.len(), 100);
+    assert_eq!(buffer_data.len(), 10_000);
     let data = buffer_data.last();
     asserts_data!(data, 0.0);
 }
+
 #[test]
+fn test_csv_data_buffer() {
+    test_save_csv();
+    test_open_csv();
+}
+
 fn test_save_excel() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_excel.xlsx");
     if !path.exists() {
@@ -154,7 +191,6 @@ fn test_save_excel() {
     assert!(path.is_file());
 }
 
-#[test]
 fn test_open_excel() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_excel.xlsx");
     std::thread::sleep(std::time::Duration::from_secs(1));
@@ -163,7 +199,13 @@ fn test_open_excel() {
         Ok(k) => k,
         Err(err) => panic!("ERROR: {err}"),
     };
-    assert_eq!(buffer_data.len(), 100);
+    assert_eq!(buffer_data.len(), 10_000);
     let data = buffer_data.last();
     asserts_data!(data, 0.0);
+}
+
+#[test]
+fn test_excel_data_buffer() {
+    test_save_excel();
+    test_open_excel();
 }

@@ -33,5 +33,10 @@ super::declare_convertion_type!(Speed => self {
         to_kilometres_per_hour  => KilometresPerHour { self.0 * 1.852    },
         to_metres_per_second    => MetresPerSecond   { self.0 * 0.514446 }
     ]
-
 });
+
+impl MetresPerSecond {
+    pub fn from_ms(metres: super::length::Metres, ms: crate::Float) -> Self {
+        Self::new(metres / (ms * 0.001))
+    }
+}
