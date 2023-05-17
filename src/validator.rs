@@ -1,11 +1,11 @@
-use crate::DynoErr;
+use crate::{DynoErr, DynoResult};
 
 pub trait Validate: Sized + std::fmt::Display {
-    fn validate(&self) -> crate::DynoResult<'_, ()>;
+    fn validate(&self) -> DynoResult<()>;
 }
 
 #[inline(always)]
-pub fn validate_nim(nim: impl AsRef<str>) -> crate::DynoResult<'static, ()> {
+pub fn validate_nim(nim: impl AsRef<str>) -> DynoResult<()> {
     let nim = nim.as_ref();
     let count = nim.chars().count();
     if count < 9 && count > 13 {
@@ -22,7 +22,7 @@ pub fn validate_nim(nim: impl AsRef<str>) -> crate::DynoResult<'static, ()> {
 }
 
 #[inline(always)]
-pub fn validate_email(val: impl AsRef<str>) -> crate::DynoResult<'static, ()> {
+pub fn validate_email(val: impl AsRef<str>) -> DynoResult<()> {
     let val = val.as_ref();
     if val.is_empty() || !val.contains('@') {
         return Err(DynoErr::validate_error(
@@ -105,7 +105,7 @@ impl std::fmt::Display for PasswordStrength {
 }
 
 #[inline(always)]
-pub fn validate_password(pswd: impl AsRef<str>) -> crate::DynoResult<'static, ()> {
+pub fn validate_password(pswd: impl AsRef<str>) -> DynoResult<()> {
     let pswd = pswd.as_ref();
     if !pswd.is_ascii() {
         return Err(DynoErr::validate_error(

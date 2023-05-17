@@ -2,22 +2,39 @@ pub mod buffer;
 pub mod data_buffer;
 pub mod infomotor;
 
+pub mod prelude {
+    pub use super::buffer::*;
+    pub use super::data_buffer::*;
+    pub use super::infomotor::*;
+    pub use super::SerialData;
+}
+
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy, serde::Deserialize, derive_more::Display)]
-#[display(
-    fmt = "time(ms): {time}, enc(pulse): {pulse_encoder}, rpm(pulse): {pulse_rpm}, temp(celcius): {temperature:.2}"
-)]
+#[display(fmt = r"SerialData {{ 
+    time: {time},
+    period: {period},
+    enc_max: {pulse_enc_max},
+    enc_raw: {pulse_enc_raw},
+    enc_z: {pulse_enc_z},
+    enc: {pulse_enc},
+    rpm: {pulse_rpm},
+    temp: {temperature}
+}}")]
 pub struct SerialData {
     pub time: u32, // in ms
-    pub pulse_encoder_max: u32,
-    pub pulse_encoder: u32,
+    pub period: u32,
+    pub pulse_enc_max: u32,
+    pub pulse_enc_raw: u32,
+    pub pulse_enc: u32,
+    pub pulse_enc_z: u32,
     pub pulse_rpm: u32,
     pub temperature: f32,
 }
 
 impl SerialData {
     pub const SIZE: usize = ::core::mem::size_of::<SerialData>();
-    pub const DELIM: u8 = b'|';
+    pub const DELIM: u8 = b'\n';
 
     #[cfg(not(feature = "use_bincode"))]
     #[inline(always)]

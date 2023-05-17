@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # This scripts runs various CI-like checks in a convenient way.
 set -eux
+_FLAGS="${1:-}"
 
-cargo test --all-targets --all-features
-cargo test --doc --all-features
+if [[ "-d" == ${_FLAGS} ]]; then 
+    cargo test --doc --all-features -- -Zunstable-options --report-time 
+else
+    cargo test --release --all-targets --all-features -- -Zunstable-options --report-time
+fi

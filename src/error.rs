@@ -1,7 +1,3 @@
-use std::{borrow::Cow, error::Error};
-
-use crate::server::ApiResponse;
-
 macro_rules! impl_from_to_string {
     ($structs:ty => [ $($($m:literal)? $source:ty as $kind:ident),* $(,)?]) => {
         $(
@@ -22,9 +18,9 @@ macro_rules! impl_err_kind {
                 #[allow(unused)]
                 #[inline(always)]
                 #[doc(hidden)]
-                pub fn [< $name:snake _error>]<S: Into<Cow<'a, str>>>(desc: S) -> Self {
+                pub fn [< $name:snake _error>]<S: ToString>(desc: S) -> Self {
                     Self {
-                        desc: desc.into(),
+                        desc: desc.to_string(),
                         kind: ErrKind::$name,
                     }
                 }
@@ -41,6 +37,7 @@ macro_rules! impl_err_kind {
     };
 }
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display, Debug, Clone, Copy)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ErrKind {
     #[cfg(feature = "backend")]
     InternalServer,
@@ -59,9 +56,7 @@ pub enum ErrKind {
     #[cfg(feature = "backend")]
     Database,
 
-    #[cfg(feature = "frontend")]
     SendRequest,
-    #[cfg(feature = "frontend")]
     Api,
 
     #[cfg(feature = "use_excel")]
@@ -72,25 +67,26 @@ pub enum ErrKind {
 
     Filesistem,
     InputOutput,
-    Any,
-    Unknown,
+    SerialPort,
+    Logger,
     Service,
     Serde,
     Parsing,
     EncodingDecoding,
     Validate,
-    Noop,
+    Unknown,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display, Debug, Clone)]
 #[display(fmt = "ERROR: {kind} - {desc}")]
-pub struct DynoErr<'a> {
-    pub desc: Cow<'a, str>,
+pub struct DynoErr {
+    pub desc: String,
     pub kind: ErrKind,
 }
 
-impl_err_kind!(DynoErr<'a> => [
-    Filesistem, InputOutput, Any, Unknown, Service, Serde, Parsing, EncodingDecoding, Validate, Serialize, Deserialize,
+impl_err_kind!(DynoErr => [
+    Filesistem, InputOutput,SerialPort, Logger, Service, Serde, Parsing,
+    EncodingDecoding, Validate, Serialize, Deserialize, Unknown, SendRequest, Api,
     "backend" InternalServer,
     "backend" BadRequest,
     "backend" Unauthorized,
@@ -99,70 +95,51 @@ impl_err_kind!(DynoErr<'a> => [
     "backend" NotImplemented,
     "backend" PasswordHash,
     "backend" Database,
-    "frontend" SendRequest,
-    "frontend" Api,
     "use_excel" Excel,
 ]);
 
-impl<'a> DynoErr<'a> {
+impl DynoErr {
     #[inline]
-    pub fn new<S: Into<Cow<'a, str>>>(desc: S, kind: ErrKind) -> Self {
+    pub fn new<S: ToString>(desc: S, kind: ErrKind) -> Self {
         Self {
-            desc: desc.into(),
+            desc: desc.to_string(),
             kind,
         }
     }
     #[inline]
     pub fn noop() -> Self {
         Self {
-            desc: "".into(),
-            kind: ErrKind::Noop,
-        }
-    }
-
-    #[inline]
-    pub fn validation<S: Into<Cow<'a, str>>>(desc: S) -> Self {
-        Self {
-            desc: desc.into(),
-            kind: ErrKind::Validate,
+            desc: "".to_owned(),
+            kind: ErrKind::Unknown,
         }
     }
 }
 
-impl Error for DynoErr<'_> {
-    fn description(&self) -> &str {
-        &self.desc
-    }
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
-    }
-    fn cause(&self) -> Option<&dyn Error> {
-        self.source()
-    }
-}
-unsafe impl Send for DynoErr<'_> {}
-unsafe impl Sync for DynoErr<'_> {}
+impl std::error::Error for DynoErr {}
+unsafe impl Send for DynoErr {}
+unsafe impl Sync for DynoErr {}
 
-impl_from_to_string!(DynoErr<'_> => [
-    "use_anyhow"    anyhow::Error                                       as Any,
+impl_from_to_string!(DynoErr => [
+    "use_anyhow"    anyhow::Error                                       as Unknown,
     "use_excel"     calamine::Error                                     as Excel,
     "use_excel"     rust_xlsxwriter::XlsxError                          as Excel,
                     Box<bincode::ErrorKind>                             as EncodingDecoding,
                     toml::de::Error                                     as Deserialize,
                     toml::ser::Error                                    as Serialize,
                     serde_json::Error                                   as Deserialize,
-                    &'static str                                        as Any,
-                    String                                              as Any,
-                    Box<dyn std::error::Error>                          as Any,
-                    Box<dyn std::error::Error + Send + Sync + 'static>  as Any,
+                    &'static str                                        as Unknown,
+                    String                                              as Unknown,
+                    Box<dyn std::error::Error>                          as Unknown,
+                    Box<dyn std::error::Error + Send + Sync + 'static>  as Unknown,
                     std::io::Error                                      as InputOutput,
                     core::num::ParseIntError                            as Parsing,
                     core::num::ParseFloatError                          as Parsing,
                     std::env::VarError                                  as InputOutput,
+                    std::sync::mpsc::SendError<Option<crate::SerialData>>       as InputOutput,
 ]);
 
 #[cfg(feature = "backend")]
-impl actix_web::error::ResponseError for DynoErr<'_> {
+impl actix_web::error::ResponseError for DynoErr {
     fn status_code(&self) -> actix_web::http::StatusCode {
         use actix_web::http::StatusCode;
         match self.kind {
@@ -177,8 +154,35 @@ impl actix_web::error::ResponseError for DynoErr<'_> {
     #[inline]
     fn error_response(&self) -> actix_web::HttpResponse {
         actix_web::HttpResponse::build(self.status_code())
-            .json(ApiResponse::<Self>::error(self.clone()))
+            .json(crate::server::ApiResponse::error(self.to_string()))
     }
 }
 
-pub type DynoResult<'err, T> = std::result::Result<T, DynoErr<'err>>;
+pub type DynoResult<T> = std::result::Result<T, DynoErr>;
+
+pub trait ResultHandler<'err, T, E> {
+    fn dyn_err(self) -> DynoResult<T>;
+    fn ignore(self);
+}
+
+impl<'err, T, E> ResultHandler<'err, T, E> for std::result::Result<T, E>
+where
+    E: std::fmt::Display,
+    DynoErr: From<E>,
+{
+    #[inline(always)]
+    fn dyn_err(self) -> std::result::Result<T, DynoErr> {
+        match self {
+            Ok(res) => Ok(res),
+            Err(err) => Err(DynoErr::from(err)),
+        }
+    }
+
+    #[inline(always)]
+    fn ignore(self) {
+        match self {
+            Ok(_) => {}
+            Err(err) => log::error!("ERROR: {err} [ignored]"),
+        }
+    }
+}

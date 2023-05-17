@@ -1,32 +1,35 @@
 use std::path::PathBuf;
 
-use dyno_types::{
+use dyno_core::{
     convertions::prelude::*,
     data_buffer::{BufferData, Data},
-    FloatMath, Numeric, SerialData,
+    CompresedSaver, FloatMath, Numeric, SerialData,
 };
 use lazy_static::lazy_static;
 
 const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
 const SER_DATA: SerialData = SerialData {
-    time: 200,
-    pulse_encoder: 4200,
+    time: 1000,
+    pulse_enc: 4200,
     pulse_rpm: 69,
     temperature: 420f32,
-    pulse_encoder_max: 360,
+    pulse_enc_max: 360,
+    period: 200,
+    pulse_enc_raw: 4200 / 4,
+    pulse_enc_z: 4200 / 360,
 };
 
 lazy_static! {
     static ref DEFAULT_DATA_BUFFER: BufferData = {
         let mut buffer = BufferData::new();
         let data = Data::from_serial(buffer.last(), &CONFIG, SER_DATA);
-        for _ in 0..100 {
+        for _ in 0..10_000 {
             buffer.push_data(data.clone());
         }
         buffer
     };
-    static ref CONFIG: dyno_types::DynoConfig = dyno_types::DynoConfig::default();
+    static ref CONFIG: dyno_core::DynoConfig = dyno_core::DynoConfig::default();
 }
 
 macro_rules! asserts_data {
@@ -84,52 +87,79 @@ fn test_calculate_data() {
 }
 #[test]
 fn test_data_buffer() {
-    assert_eq!(DEFAULT_DATA_BUFFER.len(), 100);
+    assert_eq!(DEFAULT_DATA_BUFFER.len(), 10_000);
     let data = DEFAULT_DATA_BUFFER.last();
     asserts_data!(data);
 }
 
-#[test]
-fn test_save_binaries() {
-    let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.bin");
+// fn test_save_binaries() {
+//     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.bin");
+//     if !path.exists() {
+//         match DEFAULT_DATA_BUFFER.serialize_to_file(&path) {
+//             Ok(k) => k,
+//             Err(err) => panic!("ERROR: {err}"),
+//         }
+//     }
+//     assert!(path.is_file());
+// }
+// fn test_open_binaries() {
+//     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.bin");
+//     std::thread::sleep(std::time::Duration::from_secs(1));
+//     let buffer_data = match BufferData::deserialize_from_file(path) {
+//         Ok(ok) => ok,
+//         Err(err) => panic!("ERROR: {err}"),
+//     };
+
+//     assert_eq!(buffer_data.len(), 10_000);
+//     let data = buffer_data.last();
+//     asserts_data!(data);
+// }
+// #[test]
+// fn test_binaries_data_buffer() {
+//     test_save_binaries();
+//     test_open_binaries();
+// }
+
+fn test_save_compressed() {
+    let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.dyno");
     if !path.exists() {
-        match DEFAULT_DATA_BUFFER.serialize_to_file(&path) {
+        match DEFAULT_DATA_BUFFER.compress_to_file(&path) {
             Ok(k) => k,
             Err(err) => panic!("ERROR: {err}"),
         }
     }
-    assert!(path.exists());
     assert!(path.is_file());
 }
-#[test]
-fn test_open_binaries() {
-    let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.bin");
+fn test_open_compressed() {
+    let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.dyno");
     std::thread::sleep(std::time::Duration::from_secs(1));
-    assert!(path.exists());
-    let buffer_data = match BufferData::deserialize_from_file(path) {
+    let buffer_data = match BufferData::decompress_from_file(path) {
         Ok(ok) => ok,
         Err(err) => panic!("ERROR: {err}"),
     };
 
-    assert_eq!(buffer_data.len(), 100);
+    assert_eq!(buffer_data.len(), 10_000);
     let data = buffer_data.last();
     asserts_data!(data);
 }
-
 #[test]
+fn test_compressed_data_buffer() {
+    test_save_compressed();
+    test_open_compressed();
+}
+
 fn test_save_csv() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_csv.csv");
     if !path.exists() {
         match DEFAULT_DATA_BUFFER.save_as_csv(&path) {
             Ok(k) => k,
-            Err(err) => panic!("ERROR: {err}"),
+            Err(err) => panic!("{err}"),
         }
     }
     assert!(path.exists());
     assert!(path.is_file());
 }
 
-#[test]
 fn test_open_csv() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_csv.csv");
     std::thread::sleep(std::time::Duration::from_secs(1));
@@ -138,11 +168,17 @@ fn test_open_csv() {
         Ok(k) => k,
         Err(err) => panic!("ERROR: {err}"),
     };
-    assert_eq!(buffer_data.len(), 100);
+    assert_eq!(buffer_data.len(), 10_000);
     let data = buffer_data.last();
     asserts_data!(data, 0.0);
 }
+
 #[test]
+fn test_csv_data_buffer() {
+    test_save_csv();
+    test_open_csv();
+}
+
 fn test_save_excel() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_excel.xlsx");
     if !path.exists() {
@@ -155,7 +191,6 @@ fn test_save_excel() {
     assert!(path.is_file());
 }
 
-#[test]
 fn test_open_excel() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_excel.xlsx");
     std::thread::sleep(std::time::Duration::from_secs(1));
@@ -164,7 +199,13 @@ fn test_open_excel() {
         Ok(k) => k,
         Err(err) => panic!("ERROR: {err}"),
     };
-    assert_eq!(buffer_data.len(), 100);
+    assert_eq!(buffer_data.len(), 10_000);
     let data = buffer_data.last();
     asserts_data!(data, 0.0);
+}
+
+#[test]
+fn test_excel_data_buffer() {
+    test_save_excel();
+    test_open_excel();
 }

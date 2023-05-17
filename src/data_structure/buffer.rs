@@ -2,47 +2,12 @@ use std::cmp::Ordering;
 
 use crate::{Numeric as _, SafeMath as _};
 
-#[derive(Debug, Clone, Copy, PartialEq, Default, serde::Deserialize, serde::Serialize)]
-pub struct ValIdx<T: crate::Numeric> {
-    pub index: f64,
-    pub value: T,
-}
-
-impl<T: crate::Numeric> ValIdx<T> {
-    #[inline]
-    fn new(index: f64, value: impl Into<T>) -> Self {
-        Self {
-            index,
-            value: value.into(),
-        }
-    }
-}
-impl From<[f32; 2]> for ValIdx<f32> {
-    #[inline(always)]
-    fn from(value: [f32; 2]) -> Self {
-        Self {
-            index: value[0].to_f64(),
-            value: value[1],
-        }
-    }
-}
-
-impl From<[f64; 2]> for ValIdx<f64> {
-    #[inline(always)]
-    fn from(value: [f64; 2]) -> Self {
-        Self {
-            index: value[0],
-            value: value[1],
-        }
-    }
-}
-
 pub const MAX_CAP_BUFFER: usize = 30_000;
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub struct Buffer<T: crate::Numeric>(Vec<ValIdx<T>>);
+pub struct Buffer<T: crate::Numeric>(Vec<T>);
 
 impl<T: crate::Numeric> std::ops::Deref for Buffer<T> {
-    type Target = Vec<ValIdx<T>>;
+    type Target = Vec<T>;
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -73,23 +38,22 @@ where
 
     #[inline(always)]
     pub fn push_value(&mut self, value: T) {
-        let val = ValIdx::new(self.len() as _, value);
-        self.push(val)
+        self.push(value)
     }
 
     #[inline(always)]
     pub fn iter_value(&self) -> impl Iterator<Item = T> + '_ {
-        self.iter().map(|x| x.value)
+        self.iter().copied()
     }
 
     #[inline(always)]
     pub fn last_value(&self) -> T {
-        self.last().map(|x| x.value).unwrap_or_default()
+        self.last().copied().unwrap_or_default()
     }
 
     #[inline(always)]
     pub fn first_value(&self) -> T {
-        self.first().map(|x| x.value).unwrap_or_default()
+        self.first().copied().unwrap_or_default()
     }
 
     #[inline(always)]
@@ -119,6 +83,10 @@ where
 
     #[inline(always)]
     pub fn into_points<Out: FromIterator<[f64; 2]>>(&self) -> Out {
-        FromIterator::from_iter(self.iter().map(|y| [y.index, y.value.to_f64()]))
+        FromIterator::from_iter(
+            self.iter()
+                .enumerate()
+                .map(|(idx, v)| [idx.to_f64(), v.to_f64()]),
+        )
     }
 }

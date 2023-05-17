@@ -1,11 +1,6 @@
+pub mod dynotests;
 pub mod role;
 pub mod users;
-
-#[cfg(feature = "backend")]
-pub mod backend;
-
-// #[cfg(feature = "frontend")]
-// pub mod frontend;
 
 crate::decl_constants!(
     pub COOKIE_NAME                 => "dyno_session",
@@ -15,20 +10,20 @@ crate::decl_constants!(
 );
 
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display)]
-#[display(fmt = "session {{ sub:{sub} iat:{iat}, exp:{exp} }}")]
-#[derive(Debug, Clone)]
-pub struct TokenClaims {
-    pub sub: String,
-    pub iat: usize,
-    pub exp: usize,
-}
-
-#[derive(serde::Deserialize, serde::Serialize, derive_more::Display)]
 #[display(fmt = "UserSession {{ id:{id}, role:{role} }}")]
 #[derive(Debug, Clone)]
 pub struct UserSession {
-    pub id: usize,
+    pub id: uuid::Uuid,
     pub role: role::Roles,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, derive_more::Display)]
+#[display(fmt = "session {{ sub:{sub} iat:{iat}, exp:{exp} }}")]
+#[derive(Debug, Clone)]
+pub struct TokenClaims {
+    pub sub: UserSession,
+    pub iat: usize,
+    pub exp: usize,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display)]
@@ -45,26 +40,34 @@ pub enum ResponseStatus {
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display)]
 #[display(fmt = "response_json {{ payload: {payload}, status: {status} }}")]
 #[derive(Debug, Clone)]
-pub struct ApiResponse<Type: std::fmt::Display + Sized> {
-    pub payload: Type,
+pub struct ApiResponse<T: std::fmt::Display> {
+    pub payload: T,
     pub status: ResponseStatus,
 }
 
-impl<Type: std::fmt::Display + Sized> ApiResponse<Type> {
-    pub fn success(payload: impl Into<Type>) -> Self {
+impl<T> ApiResponse<T>
+where
+    T: serde::ser::Serialize,
+    T: serde::de::DeserializeOwned,
+    T: std::fmt::Display,
+{
+    pub fn success(payload: impl Into<T>) -> Self {
         Self {
             payload: payload.into(),
             status: ResponseStatus::Success,
         }
     }
-    pub fn error(payload: impl Into<Type>) -> Self {
+
+    pub fn status_ok(&self) -> bool {
+        matches!(self.status, ResponseStatus::Success)
+    }
+}
+
+impl ApiResponse<crate::DynoErr> {
+    pub fn error(payload: impl Into<crate::DynoErr>) -> Self {
         Self {
             payload: payload.into(),
             status: ResponseStatus::Error,
         }
-    }
-
-    pub fn status_ok(&self) -> bool {
-        matches!(self.status, ResponseStatus::Success)
     }
 }

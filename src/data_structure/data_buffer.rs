@@ -6,10 +6,9 @@ use std::{
 
 use super::buffer::Buffer;
 use crate::{
-    buffer::ValIdx,
     convertions::prelude::*,
     infomotor::{MotorType, Stroke},
-    Float, Numeric,
+    DynoErr, DynoResult, Float, Numeric,
 };
 use chrono::{NaiveDateTime, Utc};
 
@@ -32,14 +31,17 @@ impl Data {
         serial_data: super::SerialData,
     ) -> Self {
         let super::SerialData {
-            time,
-            pulse_encoder_max,
-            pulse_encoder,
+            time: _,
+            period,
+            pulse_enc_max: pulse_encoder_max,
+            pulse_enc: pulse_encoder,
             pulse_rpm,
             temperature,
+            pulse_enc_raw: _,
+            pulse_enc_z: _,
         } = serial_data;
 
-        let delta_ms = time as Float;
+        let delta_ms = period as Float;
 
         let putaran = (pulse_encoder / pulse_encoder_max) as Float;
 
@@ -195,40 +197,9 @@ impl BufferData {
 }
 
 impl BufferData {
-    #[inline(always)]
-    fn bin_option() -> impl bincode::Options {
-        bincode::Options::with_big_endian(bincode::Options::allow_trailing_bytes(
-            bincode::Options::with_varint_encoding(bincode::options()),
-        ))
-    }
-
-    #[inline(always)]
-    pub fn serialize_bin(&self) -> crate::DynoResult<Vec<u8>> {
-        crate::ResultHandler::dyn_err(bincode::Options::serialize(Self::bin_option(), self))
-    }
-
-    #[inline(always)]
-    pub fn deserialize_bin(bin: &[u8]) -> crate::DynoResult<Self> {
-        crate::ResultHandler::dyn_err(bincode::Options::deserialize(Self::bin_option(), bin))
-    }
-
-    #[inline(always)]
-    pub fn serialize_to_file<P: AsRef<Path>>(&self, path: P) -> crate::DynoResult<()> {
-        // let path = path.as_ref().to_path_buf();
-        let bin = bincode::Options::serialize(Self::bin_option(), self)?;
-        crate::ResultHandler::dyn_err(std::fs::write(path, bin.as_slice()))
-    }
-
-    #[inline(always)]
-    pub fn deserialize_from_file<'err, P: AsRef<Path>>(path: P) -> crate::DynoResult<'err, Self> {
-        let data = std::fs::read(path)?;
-        crate::ResultHandler::dyn_err(bincode::Options::deserialize(Self::bin_option(), &data))
-    }
-}
-impl BufferData {
     const CSV_DELIMITER: &'static str = ",";
 
-    pub fn open_from_csv<'err, P: AsRef<Path>>(path: P) -> crate::DynoResult<'err, Self> {
+    pub fn open_from_csv<P: AsRef<Path>>(path: P) -> DynoResult<Self> {
         let mut slf = Self::default();
         let mut lines = BufReader::new(File::open(path)?).lines();
         let _header = lines.next();
@@ -261,7 +232,7 @@ impl BufferData {
         Ok(slf)
     }
 
-    pub fn save_as_csv<P: AsRef<Path>>(&self, path: P) -> crate::DynoResult<()> {
+    pub fn save_as_csv<P: AsRef<Path>>(&self, path: P) -> DynoResult<()> {
         let mut writer = BufWriter::new(File::create(path)?);
         let len = self.len();
         writeln!(&mut writer, "SPEED,RPM,TORQUE,HORSEPOWER,TEMP,TIME")?;
@@ -269,12 +240,12 @@ impl BufferData {
             writeln!(
                 &mut writer,
                 "{speed},{rpm},{torque},{horsepower},{temp},{time}",
-                speed = self.speed[idx].value,
-                rpm = self.rpm[idx].value,
-                torque = self.torque[idx].value,
-                horsepower = self.horsepower[idx].value,
-                temp = self.temp[idx].value,
-                time = self.time_stamp[idx].value,
+                speed = self.speed[idx],
+                rpm = self.rpm[idx],
+                torque = self.torque[idx],
+                horsepower = self.horsepower[idx],
+                temp = self.temp[idx],
+                time = self.time_stamp[idx],
             )
             .ok();
         }
@@ -287,14 +258,14 @@ impl BufferData {
     const EXCEL_SHEET_NAME: &'static str = "dynotest";
     const EXCEL_HEADER_NAME: &'static str = "Dynotest Data Table";
 
-    pub fn open_from_excel<'err, P: AsRef<Path>>(path: P) -> crate::DynoResult<'err, Self> {
+    pub fn open_from_excel<P: AsRef<Path>>(path: P) -> DynoResult<Self> {
         use calamine::Reader;
         let mut slf = Self::default();
         let mut wb = calamine::open_workbook_auto(path)?;
         let wb_range = match wb.worksheet_range(Self::EXCEL_SHEET_NAME) {
                 Some(Ok(range)) => range,
                 Some(Err(err)) => return Err(From::from(err)),
-                None => return Err(crate::DynoErr::excel_error(
+                None => return Err(DynoErr::excel_error(
                     format!("Worksheet `{}` not exists, please add or change the worksheet name to open succesfully open the file", Self::EXCEL_SHEET_NAME),
                 ))
             };
@@ -337,7 +308,7 @@ impl BufferData {
         Ok(slf)
     }
 
-    pub fn save_as_excel<P: AsRef<Path>>(&self, path: P) -> crate::DynoResult<()> {
+    pub fn save_as_excel<P: AsRef<Path>>(&self, path: P) -> DynoResult<()> {
         use rust_xlsxwriter::*;
         let format_header = Format::new().set_bold().set_border(FormatBorder::Medium);
         let date_format = Format::new().set_num_format("dd/mm/yyyy hh:mm AM/PM");
@@ -354,46 +325,56 @@ impl BufferData {
         for col in 0..Self::MAX_COLS_SIZE {
             ws.write_string_with_format(0, col as _, Self::BUFFER_NAME[col], &format_header)?;
             match col {
-                0 => self.speed.iter().for_each(|ValIdx { index, value }| {
-                    if let Err(err) = ws.write_number((index + 1.) as _, col as _, value.to_f64()) {
+                0 => self.speed.iter().enumerate().for_each(|(index, value)| {
+                    if let Err(err) = ws.write_number((index + 1) as _, col as _, value.to_f64()) {
                         log::error!("{err}")
                     }
                 }),
-                1 => self.rpm.iter().for_each(|ValIdx { index, value }| {
-                    if let Err(err) = ws.write_number((index + 1.) as _, col as _, value.to_f64()) {
-                        log::error!("{err}")
-                    }
-                }),
-
-                2 => self.torque.iter().for_each(|ValIdx { index, value }| {
-                    if let Err(err) = ws.write_number((index + 1.) as _, col as _, value.to_f64()) {
+                1 => self.rpm.iter().enumerate().for_each(|(index, value)| {
+                    if let Err(err) = ws.write_number((index + 1) as _, col as _, value.to_f64()) {
                         log::error!("{err}")
                     }
                 }),
 
-                3 => self.horsepower.iter().for_each(|ValIdx { index, value }| {
-                    if let Err(err) = ws.write_number((index + 1.) as _, col as _, value.to_f64()) {
+                2 => self.torque.iter().enumerate().for_each(|(index, value)| {
+                    if let Err(err) = ws.write_number((index + 1) as _, col as _, value.to_f64()) {
                         log::error!("{err}")
                     }
                 }),
 
-                4 => self.temp.iter().for_each(|ValIdx { index, value }| {
-                    if let Err(err) = ws.write_number((index + 1.) as _, col as _, value.to_f64()) {
+                3 => self
+                    .horsepower
+                    .iter()
+                    .enumerate()
+                    .for_each(|(index, value)| {
+                        if let Err(err) =
+                            ws.write_number((index + 1) as _, col as _, value.to_f64())
+                        {
+                            log::error!("{err}")
+                        }
+                    }),
+
+                4 => self.temp.iter().enumerate().for_each(|(index, value)| {
+                    if let Err(err) = ws.write_number((index + 1) as _, col as _, value.to_f64()) {
                         log::error!("{err}")
                     }
                 }),
 
-                5 => self.time_stamp.iter().for_each(|ValIdx { index, value }| {
-                    let date_time = match NaiveDateTime::from_timestamp_millis(*value as _) {
-                        Some(k) => k,
-                        None => Default::default(),
-                    };
-                    if let Err(err) =
-                        ws.write_datetime((index + 1.) as _, col as _, &date_time, &date_format)
-                    {
-                        log::error!("{err}")
-                    }
-                }),
+                5 => self
+                    .time_stamp
+                    .iter()
+                    .enumerate()
+                    .for_each(|(index, value)| {
+                        let date_time = match NaiveDateTime::from_timestamp_millis(*value as _) {
+                            Some(k) => k,
+                            None => Default::default(),
+                        };
+                        if let Err(err) =
+                            ws.write_datetime((index + 1) as _, col as _, &date_time, &date_format)
+                        {
+                            log::error!("{err}")
+                        }
+                    }),
                 _ => unreachable!(),
             };
         }

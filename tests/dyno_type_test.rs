@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use dyno_types::{convertions::prelude::*, *};
+use dyno_core::{convertions::prelude::*, *};
 
 #[test]
 fn test_tick_around() {

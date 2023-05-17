@@ -1,3 +1,10 @@
+use crate::AsStr;
+
+#[cfg_attr(
+    feature = "backend",
+    derive(sqlx::Type),
+    sqlx(rename_all = "lowercase")
+)]
 #[derive(
     serde::Deserialize,
     serde::Serialize,
@@ -9,14 +16,14 @@
     PartialEq,
     Eq,
 )]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "lowercase")]
 pub enum Roles {
-    #[display(fmt = "Admin")]
+    #[display(fmt = "admin")]
     Admin,
-    #[display(fmt = "User")]
+    #[display(fmt = "user")]
     User,
     #[default]
-    #[display(fmt = "Guest")]
+    #[display(fmt = "guest")]
     Guest,
 }
 
@@ -33,8 +40,11 @@ impl Roles {
     pub const fn is_guest(self) -> bool {
         matches!(self, Self::Admin)
     }
+}
 
-    pub fn as_str(self) -> &'static str {
+impl AsStr<'static> for Roles {
+    #[inline]
+    fn as_str(&self) -> &'static str {
         match self {
             Roles::Admin => "admin",
             Roles::User => "user",

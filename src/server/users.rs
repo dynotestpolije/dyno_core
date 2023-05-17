@@ -1,16 +1,87 @@
-use crate::DynoErr;
+use crate::{server::role::Roles, DynoErr, DynoResult};
+use chrono::{DateTime, Utc};
+
+#[cfg_attr(feature = "backend", derive(sqlx::FromRow))]
+#[derive(Debug, Default, Clone)]
+pub struct User {
+    pub id: uuid::Uuid,
+    pub nim: String,
+    pub name: String,
+    pub password: String,
+    pub role: Roles,
+    pub email: Option<String>,
+    pub photo: Option<String>,
+    pub updated_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+}
+
+impl User {
+    pub fn update_from(&mut self, value: UserUpdate) {
+        let UserUpdate {
+            nim,
+            name,
+            role,
+            email,
+            photo,
+        } = value;
+        if let Some(v) = nim {
+            self.nim = v;
+        }
+        if let Some(v) = name {
+            self.name = v;
+        }
+        if let Some(v) = role {
+            self.role = v;
+        }
+        if photo.is_some() {
+            self.photo = photo;
+        }
+        if email.is_some() {
+            self.email = email;
+        }
+        self.updated_at = Utc::now();
+    }
+}
+
+impl From<UserResponse> for User {
+    #[inline]
+    fn from(value: UserResponse) -> Self {
+        let UserResponse {
+            id,
+            nim,
+            name,
+            email,
+            photo,
+            role,
+            updated_at,
+            created_at,
+        } = value;
+        Self {
+            id,
+            nim,
+            name,
+            email,
+            photo,
+            role,
+            updated_at,
+            created_at,
+            ..Default::default()
+        }
+    }
+}
 
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display, Debug, Default, Clone)]
-#[display(fmt = "registration {{ nim:{nim}, email:{email} }}")]
-pub struct Registration {
+#[display(fmt = "UserRegistration {{ nim:{nim}, email:{email} }}")]
+pub struct UserRegistration {
     pub nim: String,
     pub email: String,
     pub password: String,
     pub confirm_password: String,
+    pub role: Roles,
 }
 
-impl crate::Validate for Registration {
-    fn validate(&self) -> crate::DynoResult<'_, ()> {
+impl crate::Validate for UserRegistration {
+    fn validate(&self) -> DynoResult<()> {
         crate::validate_nim(&self.nim)?;
         crate::validate_email(&self.email)?;
         crate::validate_password(&self.password)?;
@@ -24,37 +95,37 @@ impl crate::Validate for Registration {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display, Debug, Default, Clone)]
-#[display(fmt = "login {{ nim:{nim}, password:{password} }}")]
-pub struct Login {
+#[display(fmt = "UserLogin {{ nim:{nim}, password:{password} }}")]
+pub struct UserLogin {
     pub nim: String,
     pub password: String,
 }
-impl crate::Validate for Login {
-    fn validate(&self) -> crate::DynoResult<'_, ()> {
+impl crate::Validate for UserLogin {
+    fn validate(&self) -> DynoResult<()> {
         crate::validate_nim(&self.nim)?;
         crate::validate_password(&self.password)
     }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display, Debug, Clone)]
-#[display(fmt = "UserExt {{ id:{id}, nim:{nim}, name:{name}, email:{email:?}, role:{role} }}")]
+#[display(fmt = "UserResponse {{ id:{id}, nim:{nim}, name:{name}, email:{email:?}, role:{role} }}")]
 pub struct UserResponse {
-    pub id: usize,
+    pub id: uuid::Uuid,
     pub nim: String,
     pub name: String,
-    pub role: super::role::Roles,
+    pub role: Roles,
     pub email: Option<String>,
-    pub photo: Option<std::path::PathBuf>,
-    pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub photo: Option<String>,
+    pub updated_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display, Debug, Default, Clone)]
-#[display(fmt = "UserExt {{ nim:{nim:?}, name:{name:?}, email:{email:?}, role:{role:?} }}")]
+#[display(fmt = "UserUpdate {{ nim:{nim:?}, name:{name:?}, email:{email:?}, role:{role:?} }}")]
 pub struct UserUpdate {
     pub nim: Option<String>,
     pub name: Option<String>,
-    pub role: Option<super::role::Roles>,
+    pub role: Option<Roles>,
     pub email: Option<String>,
-    pub photo: Option<std::path::PathBuf>,
+    pub photo: Option<String>,
 }
