@@ -16,6 +16,7 @@ publish = false
 default     = ["use_log", "use_chrono", "use_excel", "dep:uuid"]
 
 backend         = ["dep:actix-web", "dep:sqlx"]
+frontend        = ["dep:reqwest", "dep:tokio"]
 use_log         = ["dep:log"]
 use_excel       = ["dep:calamine", "dep:rust_xlsxwriter"]
 use_regex       = ["dep:regex"]
@@ -34,6 +35,9 @@ bincode     = { version = "^1.3" }
 chrono      = { optional = true, version = "^0.4", features = ["serde"]}
 log         = { optional = true, version = "^0.4" }
 regex       = { optional = true, version = "^1.8" } # For checking if we need to skip auth
+
+reqwest     = { optional = true, version = "^0.11", features = ["json", "multipart"] }
+tokio       = { optional = true, version = "^1.28", features = ["rt-multi-thread", "time", "macros", "io-std", "io-util", "fs"] }
 
 # reqwest     = { optional = true, version = "0.11.14", features = ["json", "blocking", "rustls"], default-features = false }
 

@@ -52,6 +52,12 @@ pub use actix_web;
 #[cfg(feature = "backend")]
 pub use sqlx;
 
+#[cfg(feature = "frontend")]
+pub use tokio;
+
+#[cfg(feature = "frontend")]
+pub use reqwest;
+
 pub use lazy_static;
 
 pub use paste;
