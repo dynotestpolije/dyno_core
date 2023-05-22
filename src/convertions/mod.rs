@@ -261,9 +261,9 @@ macro_rules! declare_convertion_type {
                 /// ## check if self is negative sign number and normal number (Nan, Inf, etc)
                 /// if true, then return the `def` default parameter
                 /// ```
-                /// use dyno_types::convertions::length::Metres;
+                /// use dyno_core::convertions::length::Metres;
                 /// let def_param = Metres::new(1.0);
-                /// let m = Metres::new(dyno_types::Float::NAN).if_not_normal(def_param);
+                /// let m = Metres::new(dyno_core::Float::NAN).if_not_normal(def_param);
                 /// assert_eq!(m, def_param);
                 /// ```
                 #[inline(always)]
@@ -276,12 +276,12 @@ macro_rules! declare_convertion_type {
                 /// ## check if self is negative sign number and normal number (Nan, Inf, etc)
                 /// if true, then return the `def` default parameter
                 /// ```
-                /// use dyno_types::convertions::length::Metres;
+                /// use dyno_core::convertions::length::Metres;
                 /// let def_param = Metres::new(1.0);
                 /// let negative = Metres::new(-1.).if_negative_normal(def_param);
                 /// assert_eq!(negative, def_param);
                 ///
-                /// let not_normal = Metres::new(dyno_types::Float::NAN).if_negative_normal(def_param);
+                /// let not_normal = Metres::new(dyno_core::Float::NAN).if_negative_normal(def_param);
                 /// assert_eq!(not_normal, def_param);
                 /// ```
                 #[inline(always)]
@@ -309,12 +309,11 @@ pub mod prelude {
     pub use super::torque::*;
     pub use super::weight::*;
 
-    pub const MAX_TICKS: crate::Float = 2.77777e-03;
     pub trait EncoderTicks: crate::ext::Numeric + crate::ext::SafeMath {
         /// # implements per time function from milliseconds (minute)
         /// ```
-        /// use dyno_types::convertions::prelude::EncoderTicks;
-        /// use dyno_types::FloatMath;
+        /// use dyno_core::convertions::prelude::EncoderTicks;
+        /// use dyno_core::FloatMath;
         /// let value = 10.0.per_minute(100.0).round_decimal(2);
         /// assert_eq!(value, 5999.99)
         /// ```
@@ -329,8 +328,8 @@ pub mod prelude {
 
         /// # implements per time function from milliseconds (seconds)
         /// ```
-        /// use dyno_types::convertions::prelude::EncoderTicks;
-        /// use dyno_types::FloatMath;
+        /// use dyno_core::convertions::prelude::EncoderTicks;
+        /// use dyno_core::FloatMath;
         /// let value = 10.0.per_second(100.0).round_decimal(1);
         /// assert_eq!(value, 100.0)
         /// ```
@@ -345,8 +344,8 @@ pub mod prelude {
 
         /// # implements per time function from milliseconds (hour)
         /// ```
-        /// use dyno_types::convertions::prelude::EncoderTicks;
-        /// use dyno_types::FloatMath;
+        /// use dyno_core::convertions::prelude::EncoderTicks;
+        /// use dyno_core::FloatMath;
         /// let value = 10.0.per_hour(100.0).round_decimal(4);
         /// assert_eq!(value, 359999.712)
         /// ```

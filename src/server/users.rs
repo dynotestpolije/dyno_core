@@ -86,7 +86,7 @@ impl crate::Validate for UserRegistration {
         crate::validate_email(&self.email)?;
         crate::validate_password(&self.password)?;
         if self.confirm_password != self.password {
-            return Err(DynoErr::validate_error(
+            return Err(DynoErr::validation_error(
                 "Invalid confirm_password: second password is not matching with the password",
             ));
         }

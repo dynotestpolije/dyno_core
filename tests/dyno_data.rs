@@ -1,12 +1,9 @@
 use std::path::PathBuf;
 
-use dyno_core::{
-    convertions::prelude::*,
-    data_buffer::{BufferData, Data},
-    CompresedSaver, FloatMath, Numeric, SerialData,
-};
+use dyno_core::*;
 use lazy_static::lazy_static;
 
+const SIZE_TESTED: usize = 100_000;
 const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
 const SER_DATA: SerialData = SerialData {
@@ -24,7 +21,7 @@ lazy_static! {
     static ref DEFAULT_DATA_BUFFER: BufferData = {
         let mut buffer = BufferData::new();
         let data = Data::from_serial(buffer.last(), &CONFIG, SER_DATA);
-        for _ in 0..10_000 {
+        for _ in 0..SIZE_TESTED {
             buffer.push_data(data.clone());
         }
         buffer
@@ -34,7 +31,16 @@ lazy_static! {
 
 macro_rules! asserts_data {
     ($data: ident, $odo: literal) => {{
-        assert_eq!($data.rpm.to_float().round(), 41400., "data rpm asserts");
+        assert_eq!(
+            $data.rpm_roda.to_float().round(),
+            3500.,
+            "data rpm roda asserts"
+        );
+        assert_eq!(
+            $data.rpm_engine.to_float().round(),
+            41400.,
+            "data rpm engine asserts"
+        );
         assert_eq!(
             $data.odo.to_float().round_decimal(4),
             $odo,
@@ -42,83 +48,31 @@ macro_rules! asserts_data {
         );
         assert_eq!(
             $data.speed.to_float().round_decimal(2),
-            88.45,
+            93.81,
             "data speed asserts"
         );
         assert_eq!($data.temp, Celcius::new(420.), "data temp asserts");
 
         // TODO: torque and horsepower implementation
-        assert_eq!($data.torque.round_decimal(2), 569.02, "data torque asserts");
+        assert_eq!($data.torque.round_decimal(1), 48.1, "data torque asserts");
         assert_eq!(
             $data.horsepower.round_decimal(1),
-            2467.0,
+            17.6,
             "data horsepower asserts"
         );
     }};
 
     ($data: ident) => {
-        asserts_data!($data, 0.0049)
+        asserts_data!($data, 521.1902)
     };
 }
 
 #[test]
-fn test_calculate_data() {
-    let data = DEFAULT_DATA_BUFFER.last();
-    assert_eq!(data.rpm.value().round(), 41400., "data rpm asserts");
-    assert_eq!(
-        data.odo.to_float().round_decimal(4),
-        0.0049,
-        "data odo asserts"
-    );
-    assert_eq!(
-        data.speed.to_float().round_decimal(2),
-        88.45,
-        "data speed asserts"
-    );
-    assert_eq!(data.temp, Celcius::new(420.), "data temp asserts");
-
-    // TODO: torque and horsepower implementation
-    assert_eq!(data.torque.round_decimal(2), 569.02, "data torque asserts");
-    assert_eq!(
-        data.horsepower.round_decimal(2),
-        2467.0,
-        "data horsepower asserts"
-    );
-}
-#[test]
 fn test_data_buffer() {
-    assert_eq!(DEFAULT_DATA_BUFFER.len(), 10_000);
+    assert_eq!(DEFAULT_DATA_BUFFER.len(), SIZE_TESTED);
     let data = DEFAULT_DATA_BUFFER.last();
     asserts_data!(data);
 }
-
-// fn test_save_binaries() {
-//     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.bin");
-//     if !path.exists() {
-//         match DEFAULT_DATA_BUFFER.serialize_to_file(&path) {
-//             Ok(k) => k,
-//             Err(err) => panic!("ERROR: {err}"),
-//         }
-//     }
-//     assert!(path.is_file());
-// }
-// fn test_open_binaries() {
-//     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.bin");
-//     std::thread::sleep(std::time::Duration::from_secs(1));
-//     let buffer_data = match BufferData::deserialize_from_file(path) {
-//         Ok(ok) => ok,
-//         Err(err) => panic!("ERROR: {err}"),
-//     };
-
-//     assert_eq!(buffer_data.len(), 10_000);
-//     let data = buffer_data.last();
-//     asserts_data!(data);
-// }
-// #[test]
-// fn test_binaries_data_buffer() {
-//     test_save_binaries();
-//     test_open_binaries();
-// }
 
 fn test_save_compressed() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.dyno");
@@ -138,7 +92,7 @@ fn test_open_compressed() {
         Err(err) => panic!("ERROR: {err}"),
     };
 
-    assert_eq!(buffer_data.len(), 10_000);
+    assert_eq!(buffer_data.len(), SIZE_TESTED);
     let data = buffer_data.last();
     asserts_data!(data);
 }
@@ -168,7 +122,7 @@ fn test_open_csv() {
         Ok(k) => k,
         Err(err) => panic!("ERROR: {err}"),
     };
-    assert_eq!(buffer_data.len(), 10_000);
+    assert_eq!(buffer_data.len(), SIZE_TESTED);
     let data = buffer_data.last();
     asserts_data!(data, 0.0);
 }
@@ -199,7 +153,7 @@ fn test_open_excel() {
         Ok(k) => k,
         Err(err) => panic!("ERROR: {err}"),
     };
-    assert_eq!(buffer_data.len(), 10_000);
+    assert_eq!(buffer_data.len(), SIZE_TESTED);
     let data = buffer_data.last();
     asserts_data!(data, 0.0);
 }

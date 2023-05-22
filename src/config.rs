@@ -1,6 +1,7 @@
-use crate::convertions::{length, weight};
-use crate::infomotor::MotorType;
-use crate::Numeric;
+use crate::{
+    convertions::{length, weight},
+    MotorType, Numeric,
+};
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct DynoConfig {

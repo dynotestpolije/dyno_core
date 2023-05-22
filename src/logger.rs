@@ -112,7 +112,7 @@ fn open_file<P: AsRef<Path>>(file: P) -> DynoResult<File> {
         .truncate(false)
         .create(true)
         .open(file)
-        .map_err(DynoErr::filesistem_error)
+        .map_err(DynoErr::filesystem_error)
 }
 
 #[inline]
@@ -141,8 +141,8 @@ struct FileLogger<W: io::Write + Send + 'static> {
 impl FileLogger<File> {
     fn new(file: PathBuf, action: FileAction, max_len: usize) -> DynoResult<Self> {
         let fp = open_file(&file)?;
-        let metadata = fp.metadata().map_err(DynoErr::filesistem_error)?;
-        let last_access = metadata.modified().map_err(DynoErr::filesistem_error)?;
+        let metadata = fp.metadata().map_err(DynoErr::filesystem_error)?;
+        let last_access = metadata.modified().map_err(DynoErr::filesystem_error)?;
 
         let len = metadata.len() as usize;
         Ok(Self {

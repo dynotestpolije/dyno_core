@@ -1,4 +1,4 @@
-use crate::infomotor::InfoMotor;
+use crate::InfoMotor;
 use chrono::{DateTime, Utc};
 
 #[cfg_attr(feature = "backend", derive(sqlx::FromRow))]

@@ -64,8 +64,9 @@ pub enum ErrKind {
 
     Serialize,
     Deserialize,
+    Plotters,
 
-    Filesistem,
+    Filesystem,
     InputOutput,
     SerialPort,
     Logger,
@@ -73,7 +74,7 @@ pub enum ErrKind {
     Serde,
     Parsing,
     EncodingDecoding,
-    Validate,
+    Validation,
     Unknown,
 }
 
@@ -85,8 +86,8 @@ pub struct DynoErr {
 }
 
 impl_err_kind!(DynoErr => [
-    Filesistem, InputOutput,SerialPort, Logger, Service, Serde, Parsing,
-    EncodingDecoding, Validate, Serialize, Deserialize, Unknown, SendRequest, Api,
+    Filesystem, InputOutput,SerialPort, Logger, Service, Serde, Parsing,
+    EncodingDecoding, Validation, Serialize, Deserialize, Unknown, SendRequest, Api, Plotters,
     "backend" InternalServer,
     "backend" BadRequest,
     "backend" Unauthorized,
@@ -130,13 +131,28 @@ impl_from_to_string!(DynoErr => [
                     &'static str                                        as Unknown,
                     String                                              as Unknown,
                     Box<dyn std::error::Error>                          as Unknown,
-                    Box<dyn std::error::Error + Send + Sync + 'static>  as Unknown,
+                    Box<dyn std::error::Error + Send + Sync>            as Unknown,
                     std::io::Error                                      as InputOutput,
                     core::num::ParseIntError                            as Parsing,
                     core::num::ParseFloatError                          as Parsing,
                     std::env::VarError                                  as InputOutput,
-                    std::sync::mpsc::SendError<Option<crate::SerialData>>       as InputOutput,
 ]);
+
+impl<T: ToString> From<std::sync::mpsc::SendError<T>> for DynoErr {
+    fn from(value: std::sync::mpsc::SendError<T>) -> Self {
+        Self::input_output_error(value)
+    }
+}
+
+#[cfg(feature = "use_plotters")]
+impl<E> From<plotters::drawing::DrawingAreaErrorKind<E>> for DynoErr
+where
+    E: std::error::Error + Send + Sync,
+{
+    fn from(value: plotters::drawing::DrawingAreaErrorKind<E>) -> Self {
+        Self::plotters_error(value)
+    }
+}
 
 #[cfg(feature = "backend")]
 impl actix_web::error::ResponseError for DynoErr {
@@ -158,20 +174,21 @@ impl actix_web::error::ResponseError for DynoErr {
     }
 }
 
-pub type DynoResult<T> = std::result::Result<T, DynoErr>;
+pub type DynoResult<T> = ::core::result::Result<T, DynoErr>;
 
-pub trait ResultHandler<'err, T, E> {
+pub trait ResultHandler<T, E> {
     fn dyn_err(self) -> DynoResult<T>;
     fn ignore(self);
 }
 
-impl<'err, T, E> ResultHandler<'err, T, E> for std::result::Result<T, E>
+impl<T, E> ResultHandler<T, E> for ::core::result::Result<T, E>
 where
-    E: std::fmt::Display,
+    T: Sized,
+    E: std::error::Error,
     DynoErr: From<E>,
 {
     #[inline(always)]
-    fn dyn_err(self) -> std::result::Result<T, DynoErr> {
+    fn dyn_err(self) -> DynoResult<T> {
         match self {
             Ok(res) => Ok(res),
             Err(err) => Err(DynoErr::from(err)),
@@ -180,9 +197,18 @@ where
 
     #[inline(always)]
     fn ignore(self) {
-        match self {
-            Ok(_) => {}
-            Err(err) => log::error!("ERROR: {err} [ignored]"),
+        if let Err(err) = self {
+            log::error!("ERROR: {err} [ignored]")
         }
     }
+}
+
+#[macro_export]
+macro_rules! ignore_err {
+    ($err:expr) => {
+        match $err {
+            Ok(_) => (),
+            Err(err) => $crate::log::error!("ERROR[IGNORED]: {err}"),
+        }
+    };
 }

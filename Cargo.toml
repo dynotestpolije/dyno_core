@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Rizal Achmad Pahlevi <rizal.ahmadp@gmail.com>"]
 edition = "2021"
 readme = "README.md"
-repository = "https://github.com/dynotestpolije/dyno_types"
+repository = "https://github.com/dynotestpolije/dyno_core"
 # license = "MIT"
 # license-file = "LICENSE"
 keywords = ["network", "graphics", "embeded", "gui", "client", "math", "server"]
@@ -20,6 +20,7 @@ use_log         = ["dep:log"]
 use_excel       = ["dep:calamine", "dep:rust_xlsxwriter"]
 use_regex       = ["dep:regex"]
 use_chrono      = ["dep:chrono"]
+use_plot        = ["dep:plotly"]
 use_bincode     = []
 
 [dependencies]
@@ -40,6 +41,8 @@ regex       = { optional = true, version = "^1.8" } # For checking if we need to
 calamine            = { optional = true, version = "^0.19", features = ["dates"] }
 rust_xlsxwriter     = { optional = true, version = "^0.38" }
 miniz_oxide         = { version = "0.7.1", features = ["std"] }
+plotly = { version = "0.8.3", features = ["kaleido"], optional = true}
+
 
 [dependencies.actix-web]
 version = "^4.3"
@@ -61,3 +64,5 @@ version = "^1.3"
 optional = true
 features = ["serde", "v4"] 
 
+# [profile.release]
+# debug = true

@@ -1,21 +1,31 @@
 #![allow(unused_comparisons)]
 
 mod config;
-mod data_structure;
 mod error;
 mod ext;
 mod logger;
 mod macros;
 mod validator;
 
+#[cfg(feature = "use_plot")]
+mod ploting;
+
 pub mod convertions;
+pub mod data_structure;
+pub mod server;
+
+#[cfg(feature = "use_plot")]
+pub use ploting::*;
 
 pub use config::*;
-pub use data_structure::*;
 pub use error::*;
 pub use ext::*;
 pub use logger::*;
 pub use validator::*;
+
+pub use convertions::prelude::*;
+pub use data_structure::prelude::*;
+pub use server::*;
 
 #[cfg(feature = "default")]
 pub use derive_more;
@@ -27,9 +37,6 @@ pub use serde_json;
 pub use toml;
 #[cfg(feature = "default")]
 pub use uuid;
-
-pub mod server;
-pub use server::*;
 
 #[cfg(feature = "use_chrono")]
 pub use chrono;
@@ -83,6 +90,32 @@ macro_rules! ternary {
             $trues
         } else {
             $falsies
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! set_builder {
+    (&mut $strc:ident {$($name:ident: $nt:ty),* $(,)? }, $($def:expr)?) => {
+        paste::paste! {
+            #[derive(Default)]
+            pub struct [<$strc Builder>] {
+                data: $strc,
+            }
+            impl [<$strc Builder>] {
+                $(
+                    pub fn $name(&mut self, $name: impl Into<$nt>) -> &mut Self {
+                        self.data.$name = $name.into();
+                        self
+                    }
+                )*
+                pub fn finish(&self) -> $strc {
+                    $strc {
+                        $($name: self.data.$name.clone()),*
+                        $(, $def)?
+                    }
+                }
+            }
         }
     };
 }

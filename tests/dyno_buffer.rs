@@ -1,13 +1,13 @@
 use dyno_core::*;
 
-type Buffer = buffer::Buffer<Float>;
+type Buf = Buffer<Float>;
 lazy_static::lazy_static! {
-    static ref BUFFER: Buffer = {
-        let mut buffer: Buffer = Buffer::default();
+    static ref BUFFER: Buf = {
+        let mut buffer: Buf = Buf::default();
         for _ in 0..99 {
-            buffer.push_value(69f64);
+            buffer.push(69f64);
         }
-        buffer.push_value(420f64);
+        buffer.push(420f64);
         buffer
     };
 }
@@ -17,7 +17,7 @@ fn test_buffer_initialize() {
     assert_eq!(BUFFER.first_value(), 69f64);
     assert_eq!(BUFFER.last_value(), 420f64);
     assert_eq!(BUFFER.len(), 100);
-    assert_eq!(BUFFER.capacity(), buffer::MAX_CAP_BUFFER);
+    assert_eq!(BUFFER.capacity(), Buffer::<Float>::MAX_CAP_BUFFER);
 }
 
 #[test]

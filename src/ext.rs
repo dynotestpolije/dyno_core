@@ -13,7 +13,7 @@ pub trait FloatMath {
 
     /// # rounding floating point number in specified decimal digit place
     /// ```
-    /// use dyno_types::FloatMath;
+    /// use dyno_core::FloatMath;
     /// let value = 69.6969.round_decimal(2);
     /// assert_eq!(value, 69.70);
     /// ```
@@ -33,7 +33,7 @@ pub trait SafeMath {
     type Rhs;
     /// # interface for save way to devide beetween numbers
     /// ```
-    /// use dyno_types::SafeMath;
+    /// use dyno_core::SafeMath;
     ///
     /// let is_safe_value = 10.0.safe_div(2.0);
     /// let is_not_safe_value = 10.0.safe_div(f64::NAN);
