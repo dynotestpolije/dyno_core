@@ -26,6 +26,16 @@ pub struct TokenClaims {
     pub exp: usize,
 }
 
+impl TokenClaims {
+    #[allow(unused)]
+    pub fn new(sub: UserSession) -> Self {
+        let now = chrono::Utc::now();
+        let iat = now.timestamp_millis() as usize;
+        let exp = (now + chrono::Duration::minutes(120)).timestamp_millis() as usize;
+        Self { sub, exp, iat }
+    }
+}
+
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display)]
 #[serde(rename_all = "lowercase")]
 #[derive(Debug, Clone, Copy)]
@@ -51,23 +61,21 @@ where
     T: serde::de::DeserializeOwned,
     T: std::fmt::Display,
 {
-    pub fn success(payload: impl Into<T>) -> Self {
+    pub fn success(payload: T) -> Self {
         Self {
-            payload: payload.into(),
+            payload,
             status: ResponseStatus::Success,
         }
     }
 
-    pub fn status_ok(&self) -> bool {
-        matches!(self.status, ResponseStatus::Success)
-    }
-}
-
-impl ApiResponse<crate::DynoErr> {
-    pub fn error(payload: impl Into<crate::DynoErr>) -> Self {
+    pub fn error(payload: T) -> Self {
         Self {
-            payload: payload.into(),
+            payload,
             status: ResponseStatus::Error,
         }
+    }
+
+    pub const fn status_ok(&self) -> bool {
+        matches!(self.status, ResponseStatus::Success)
     }
 }

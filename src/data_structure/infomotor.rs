@@ -173,6 +173,7 @@ impl MotorType {
     }
 }
 
+#[cfg_attr(feature = "backend", derive(sqlx::FromRow))]
 #[derive(Debug, Clone, derive_more::Display, serde::Deserialize, serde::Serialize)]
 #[display(fmt = "[name: {name}]")]
 pub struct ElectricMotor {
@@ -187,6 +188,7 @@ impl Default for ElectricMotor {
     }
 }
 
+#[cfg_attr(feature = "backend", derive(sqlx::FromRow))]
 #[derive(Debug, Clone, derive_more::Display, serde::Deserialize, serde::Serialize)]
 #[display(fmt = "[{name} - {cc}|{cylinder}|{stroke}]")]
 #[serde(default)]

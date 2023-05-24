@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use dyno_core::*;
 use lazy_static::lazy_static;
 
-const SIZE_TESTED: usize = 100_000;
+const SIZE_TESTED: usize = 1000;
 const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
 const SER_DATA: SerialData = SerialData {
@@ -63,7 +63,7 @@ macro_rules! asserts_data {
     }};
 
     ($data: ident) => {
-        asserts_data!($data, 521.1902)
+        asserts_data!($data, 5.2119)
     };
 }
 

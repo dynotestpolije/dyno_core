@@ -189,7 +189,6 @@ pub struct BufferData {
     pub horsepower: Buffer<HorsePower>,
     pub temp: Buffer<Celcius>,
     pub time_stamp: Buffer<i64>,
-    pub odo: KiloMetres,
 
     pub last: Data,
     pub len: usize,
@@ -233,12 +232,11 @@ impl BufferData {
         self.horsepower.clear();
         self.temp.clear();
         self.time_stamp.clear();
-        self.odo = KiloMetres::default();
         self.len = 0;
     }
 
     #[inline(always)]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.len == 0
     }
 
@@ -252,7 +250,6 @@ impl BufferData {
         self.temp.push(data.temp);
         self.time_stamp
             .push(data.time_stamp.timestamp_millis() as _);
-        self.odo += data.odo;
 
         self.last.from_self(data);
         self.len += 1;

@@ -148,7 +148,7 @@ pub fn any_from_u8_slice<T: Sized>(b: &[u8]) -> T {
     unsafe { ::core::ptr::read::<T>(b.as_ptr() as *const T) }
 }
 
-pub trait BinSerializeDeserialize: Sized + serde::Serialize + serde::de::DeserializeOwned {
+pub trait BinSerializeDeserialize: serde::Serialize + serde::de::DeserializeOwned {
     #[inline(always)]
     fn serialize_bin(&self) -> crate::DynoResult<Vec<u8>> {
         bincode::serialize(self).map_err(From::from)
@@ -159,13 +159,13 @@ pub trait BinSerializeDeserialize: Sized + serde::Serialize + serde::de::Deseria
         bincode::deserialize(bin).map_err(From::from)
     }
 
-    #[deprecated(note = "use the CompresedSaver impl or compress_to_file() instead")]
+    #[deprecated(note = "use the `CompresedSaver::compress_to_file()` instead")]
     fn serialize_to_file<P: AsRef<std::path::Path>>(&self, path: P) -> crate::DynoResult<()> {
         let data = self.serialize_bin()?;
         std::fs::write(path, data).map_err(From::from)
     }
 
-    #[deprecated(note = "use the CompresedSaver impl or decompress_from_file() instead")]
+    #[deprecated(note = "use the `CompresedSaver::decompress_from_file()` instead")]
     fn deserialize_from_file<P: AsRef<std::path::Path>>(path: P) -> crate::DynoResult<Self> {
         let data = std::fs::read(path)?;
         bincode::deserialize(&data).map_err(From::from)
@@ -173,8 +173,7 @@ pub trait BinSerializeDeserialize: Sized + serde::Serialize + serde::de::Deseria
     // add code here
 }
 
-impl<T> BinSerializeDeserialize for T where T: Sized + serde::Serialize + serde::de::DeserializeOwned
-{}
+impl<T: serde::Serialize + serde::de::DeserializeOwned> BinSerializeDeserialize for T {}
 
 pub trait CompresedSaver: BinSerializeDeserialize {
     fn compress_to_file<P: AsRef<std::path::Path>>(&self, path: P) -> crate::DynoResult<()> {
@@ -182,7 +181,6 @@ pub trait CompresedSaver: BinSerializeDeserialize {
         let data = miniz_oxide::deflate::compress_to_vec(&serialized, 6);
         std::fs::write(path, data).map_err(From::from)
     }
-
     fn decompress_from_file<P: AsRef<std::path::Path>>(path: P) -> crate::DynoResult<Self> {
         let deserialized = std::fs::read(path)?;
         let data = miniz_oxide::inflate::decompress_to_vec(&deserialized)
@@ -191,4 +189,4 @@ pub trait CompresedSaver: BinSerializeDeserialize {
     }
 }
 
-impl<T> CompresedSaver for T where T: BinSerializeDeserialize {}
+impl<T: BinSerializeDeserialize> CompresedSaver for T {}

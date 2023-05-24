@@ -52,15 +52,23 @@ pub enum ErrKind {
     #[cfg(feature = "backend")]
     NotImplemented,
     #[cfg(feature = "backend")]
-    PasswordHash,
-    #[cfg(feature = "backend")]
     Database,
+    #[cfg(feature = "use_crypto")]
+    PasswordHash,
+    #[cfg(feature = "use_crypto")]
+    Checksum,
+    #[cfg(feature = "use_crypto")]
+    Jwt,
+
 
     SendRequest,
     Api,
 
     #[cfg(feature = "use_excel")]
     Excel,
+
+    #[cfg(feature = "use_async")]
+    AsyncTask,
 
     Serialize,
     Deserialize,
@@ -75,6 +83,7 @@ pub enum ErrKind {
     Parsing,
     EncodingDecoding,
     Validation,
+    Any,
     Unknown,
 }
 
@@ -86,7 +95,7 @@ pub struct DynoErr {
 }
 
 impl_err_kind!(DynoErr => [
-    Filesystem, InputOutput,SerialPort, Logger, Service, Serde, Parsing,
+    Filesystem, InputOutput,SerialPort, Logger, Service, Serde, Parsing,Any,
     EncodingDecoding, Validation, Serialize, Deserialize, Unknown, SendRequest, Api, Plotters,
     "backend" InternalServer,
     "backend" BadRequest,
@@ -94,9 +103,12 @@ impl_err_kind!(DynoErr => [
     "backend" Forbidden,
     "backend" UnsupportedMediaType,
     "backend" NotImplemented,
-    "backend" PasswordHash,
     "backend" Database,
+    "use_crypto" PasswordHash,
+    "use_crypto" Jwt,
+    "use_crypto" Checksum,
     "use_excel" Excel,
+    "use_async" AsyncTask,
 ]);
 
 impl DynoErr {
@@ -114,6 +126,10 @@ impl DynoErr {
             kind: ErrKind::Unknown,
         }
     }
+    #[inline]
+    pub const fn is_noop(&self) -> bool {
+        matches!(self.kind, ErrKind::Unknown)
+    }
 }
 
 impl std::error::Error for DynoErr {}
@@ -121,17 +137,18 @@ unsafe impl Send for DynoErr {}
 unsafe impl Sync for DynoErr {}
 
 impl_from_to_string!(DynoErr => [
-    "use_anyhow"    anyhow::Error                                       as Unknown,
+    "use_anyhow"    anyhow::Error                                       as Any,
     "use_excel"     calamine::Error                                     as Excel,
     "use_excel"     rust_xlsxwriter::XlsxError                          as Excel,
+    "use_async"     tokio::task::JoinError                              as AsyncTask,
                     Box<bincode::ErrorKind>                             as EncodingDecoding,
                     toml::de::Error                                     as Deserialize,
                     toml::ser::Error                                    as Serialize,
                     serde_json::Error                                   as Deserialize,
-                    &'static str                                        as Unknown,
-                    String                                              as Unknown,
-                    Box<dyn std::error::Error>                          as Unknown,
-                    Box<dyn std::error::Error + Send + Sync>            as Unknown,
+                    &'static str                                        as Any,
+                    String                                              as Any,
+                    Box<dyn std::error::Error>                          as Any,
+                    Box<dyn std::error::Error + Send + Sync>            as Any,
                     std::io::Error                                      as InputOutput,
                     core::num::ParseIntError                            as Parsing,
                     core::num::ParseFloatError                          as Parsing,
@@ -154,6 +171,8 @@ where
     }
 }
 
+pub type DynoResult<T> = ::core::result::Result<T, DynoErr>;
+
 #[cfg(feature = "backend")]
 impl actix_web::error::ResponseError for DynoErr {
     fn status_code(&self) -> actix_web::http::StatusCode {
@@ -170,11 +189,9 @@ impl actix_web::error::ResponseError for DynoErr {
     #[inline]
     fn error_response(&self) -> actix_web::HttpResponse {
         actix_web::HttpResponse::build(self.status_code())
-            .json(crate::server::ApiResponse::error(self.to_string()))
+            .json(crate::model::ApiResponse::error(self.to_string()))
     }
 }
-
-pub type DynoResult<T> = ::core::result::Result<T, DynoErr>;
 
 pub trait ResultHandler<T, E> {
     fn dyn_err(self) -> DynoResult<T>;

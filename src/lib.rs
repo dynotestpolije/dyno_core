@@ -12,7 +12,10 @@ mod ploting;
 
 pub mod convertions;
 pub mod data_structure;
-pub mod server;
+pub mod model;
+
+#[cfg(feature = "use_crypto")]
+pub mod crypto;
 
 #[cfg(feature = "use_plot")]
 pub use ploting::*;
@@ -25,7 +28,7 @@ pub use validator::*;
 
 pub use convertions::prelude::*;
 pub use data_structure::prelude::*;
-pub use server::*;
+pub use model::*;
 
 #[cfg(feature = "default")]
 pub use derive_more;
@@ -49,11 +52,12 @@ pub use regex;
 
 #[cfg(feature = "backend")]
 pub use actix_web;
-#[cfg(feature = "backend")]
-pub use sqlx;
 
-#[cfg(feature = "frontend")]
+#[cfg(feature = "use_async")]
 pub use tokio;
+
+#[cfg(feature = "use_async")]
+pub use crossbeam_channel;
 
 #[cfg(feature = "frontend")]
 pub use reqwest;
@@ -123,5 +127,19 @@ macro_rules! set_builder {
                 }
             }
         }
+    };
+}
+
+#[cfg(feature = "use_async")]
+#[macro_export]
+macro_rules! asyncify {
+    (move || $f:expr) => {
+        match $crate::tokio::task::spawn_blocking(move || $f).await {
+            Ok(res) => res.map_err(From::from),
+            Err(_) => Err($crate::DynoErr::async_task_error("background task failed")),
+        }
+    };
+    (async move $f:expr) => {
+        $crate::tokio::spawn(async move { $crate::asyncify!($f) })
     };
 }
