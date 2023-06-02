@@ -86,40 +86,40 @@ impl DynoConfig {
 
 #[inline(always)]
 fn default_diameter_roller() -> length::Metres {
-    length::Metres::new(0.1422) // 14.22 cm
+    length::Metres(0.1422) // 14.22 cm
 }
 
 #[inline(always)]
 fn default_diameter_roller_beban() -> length::Metres {
-    length::Metres::new(0.1933) //  19.33 cm
+    length::Metres(0.1933) //  19.33 cm
 }
 
 #[inline(always)]
 fn default_diameter_gear_encoder() -> length::Metres {
-    length::Metres::new(0.1)
+    length::Metres(0.1)
 }
 
 #[inline(always)]
 fn default_diameter_gear_beban() -> length::Metres {
-    length::Metres::new(0.054)
+    length::Metres(0.054)
 }
 
 #[inline(always)]
 fn default_jarak_gear() -> length::Metres {
-    length::Metres::new(0.144)
+    length::Metres(0.144)
 }
 
 #[inline(always)]
 fn default_berat_beban() -> weight::KiloGram {
-    weight::KiloGram::new(18.5)
+    weight::KiloGram(18.5)
 }
 
 #[inline(always)]
 fn default_gaya_beban() -> crate::Float {
-    18.5 * crate::GRAVITY_SPEED
+    default_berat_beban().value() * crate::GRAVITY_SPEED
 }
 
 #[inline(always)]
 fn default_keliling_roller() -> length::Metres {
-    length::Metres::new(0.1422 * crate::PI)
+    default_diameter_roller() * crate::PI
 }

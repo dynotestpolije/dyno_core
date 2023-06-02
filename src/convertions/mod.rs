@@ -40,7 +40,7 @@ macro_rules! declare_std_convertion_type {
             serde::Deserialize,
             serde::Serialize,
         )]
-        pub struct $types($crate::Float);
+        pub struct $types(pub $crate::Float);
         impl $types {
             #[inline(always)]
             pub fn new(num: impl $crate::ext::Numeric) -> Self {
@@ -57,6 +57,10 @@ macro_rules! declare_std_convertion_type {
             #[inline]
             pub fn value(self) -> $crate::Float {
                 self.0
+            }
+            #[inline]
+            pub fn value_mut(&mut self) -> &mut $crate::Float {
+                &mut self.0
             }
         }
         impl std::fmt::Display for $types {

@@ -1,16 +1,13 @@
 use crate::DynoConfig;
 use chrono::NaiveDateTime;
 
-#[cfg_attr(feature = "backend", derive(sqlx::FromRow))]
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct DynoTest {
-    pub id: i64,
-    pub user_id: i64,
-    pub info_id: i64,
+    pub id: u32,
+    pub user_id: u32,
+    pub info_id: u32,
     pub data_url: String,
-    pub data_url_excel: String,
-    pub data_url_csv: String,
-    pub data_url_pdf: String,
+    pub data_checksum: String,
     pub verified: bool,
     pub start: NaiveDateTime,
     pub stop: NaiveDateTime,
@@ -19,7 +16,6 @@ pub struct DynoTest {
 }
 
 #[repr(u32)]
-#[cfg_attr(feature = "backend", derive(sqlx::Type))]
 #[derive(
     Debug,
     Default,
@@ -32,14 +28,12 @@ pub struct DynoTest {
     serde::Deserialize,
     serde::Serialize,
 )]
-#[cfg_attr(feature = "backend", sqlx(type_name = "motor_type"))]
 pub enum MotorTy {
     Electric = 0,
     #[default]
     Engine = 1,
 }
 
-#[cfg_attr(feature = "backend", derive(sqlx::FromRow))]
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct MotorInfo {
     pub name: Option<String>,
@@ -48,15 +42,11 @@ pub struct MotorInfo {
     pub stroke: Option<u32>,
 }
 
-#[cfg_attr(feature = "backend", derive(sqlx::FromRow))]
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct DynoTestInfo {
-    pub id: i64,
+    pub id: u32,
     pub motor_type: MotorTy,
-
-    #[cfg_attr(feature = "backend", sqlx(flatten))]
     pub motor_info: MotorInfo,
-
     pub diameter_roller: Option<f64>,
     pub diameter_roller_beban: Option<f64>,
     pub diameter_gear_encoder: Option<f64>,
@@ -69,7 +59,7 @@ pub struct DynoTestInfo {
 
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct DynoTestDataInfo {
-    pub data_size: usize,
+    pub checksum_hex: String,
     pub config: DynoConfig,
     pub start: NaiveDateTime,
     pub stop: NaiveDateTime,

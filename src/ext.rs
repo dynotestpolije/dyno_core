@@ -176,17 +176,104 @@ pub trait BinSerializeDeserialize: serde::Serialize + serde::de::DeserializeOwne
 impl<T: serde::Serialize + serde::de::DeserializeOwned> BinSerializeDeserialize for T {}
 
 pub trait CompresedSaver: BinSerializeDeserialize {
-    fn compress_to_file<P: AsRef<std::path::Path>>(&self, path: P) -> crate::DynoResult<()> {
+    #[inline]
+    fn compress(&self) -> crate::DynoResult<Vec<u8>> {
         let serialized = self.serialize_bin()?;
-        let data = miniz_oxide::deflate::compress_to_vec(&serialized, 6);
-        std::fs::write(path, data).map_err(From::from)
+        Ok(miniz_oxide::deflate::compress_to_vec(&serialized, 6))
     }
-    fn decompress_from_file<P: AsRef<std::path::Path>>(path: P) -> crate::DynoResult<Self> {
-        let deserialized = std::fs::read(path)?;
-        let data = miniz_oxide::inflate::decompress_to_vec(&deserialized)
-            .map_err(crate::DynoErr::encoding_decoding_error)?;
-        bincode::deserialize(&data).map_err(From::from)
+    #[inline]
+    fn decompress(data: impl AsRef<[u8]>) -> crate::DynoResult<Self> {
+        miniz_oxide::inflate::decompress_to_vec(data.as_ref())
+            .map_err(crate::DynoErr::encoding_decoding_error)
+            .and_then(|data| {
+                bincode::deserialize(&data).map_err(crate::DynoErr::encoding_decoding_error)
+            })
+    }
+    fn compress_to_path<P: AsRef<std::path::Path>>(&self, path: P) -> crate::DynoResult<()> {
+        std::fs::write(path, self.compress()?).map_err(From::from)
+    }
+    fn decompress_from_path<P: AsRef<std::path::Path>>(path: P) -> crate::DynoResult<Self> {
+        let data = std::fs::read(path)?;
+        Self::decompress(data)
     }
 }
 
 impl<T: BinSerializeDeserialize> CompresedSaver for T {}
+
+pub trait CsvSaver: Sized {
+    const CSV_DELIMITER: &'static str;
+
+    fn open_csv_from_reader<R: std::io::BufRead>(reader: R) -> crate::DynoResult<Self>;
+    fn save_csv_from_writer<W: std::io::Write>(&self, writer: &mut W) -> crate::DynoResult<()>;
+
+    fn open_csv_from_bytes<B: AsRef<[u8]>>(bytes: B) -> crate::DynoResult<Self> {
+        Self::open_csv_from_reader(bytes.as_ref())
+    }
+
+    fn save_csv_into_bytes(&self) -> crate::DynoResult<Vec<u8>> {
+        let mut buffer = Vec::new();
+        self.save_csv_from_writer(&mut buffer)?;
+        Ok(buffer)
+    }
+
+    fn open_csv_from_path<P: AsRef<std::path::Path>>(path: P) -> crate::DynoResult<Self> {
+        let file = std::io::BufReader::new(std::fs::File::open(path)?);
+        Self::open_csv_from_reader(file).map_err(From::from)
+    }
+
+    fn save_csv_from_path<P: AsRef<std::path::Path>>(&self, path: P) -> crate::DynoResult<()> {
+        use std::io::Write;
+        let mut file = std::io::BufWriter::new(std::fs::File::create(path)?);
+        self.save_csv_from_writer(&mut file)?;
+        file.flush().map_err(From::from)
+    }
+}
+
+#[cfg(feature = "use_excel")]
+pub trait ExcelSaver: Sized {
+    const SIZE_IDX: usize;
+    const EXCEL_SHEET_NAME: &'static str;
+    const EXCEL_HEADER_NAME: &'static str;
+
+    fn open_excel_from_worksheet<R>(worksheet: calamine::Xlsx<R>) -> crate::DynoResult<Self>
+    where
+        R: std::io::Read + std::io::Seek;
+
+    fn save_excel_from_worksheet(
+        &self,
+        worksheet: &mut rust_xlsxwriter::Worksheet,
+    ) -> crate::DynoResult<()>;
+
+    fn open_excel_from_reader<R>(reader: R) -> crate::DynoResult<Self>
+    where
+        R: std::io::Read + std::io::Seek,
+    {
+        calamine::open_workbook_from_rs::<calamine::Xlsx<R>, R>(reader)
+            .map_err(crate::DynoErr::excel_error)
+            .and_then(Self::open_excel_from_worksheet)
+    }
+
+    fn save_excel_from_writer<W: std::io::Write>(&self, writer: &mut W) -> crate::DynoResult<()> {
+        let mut wb = rust_xlsxwriter::Workbook::new();
+        let ws = wb
+            .add_worksheet()
+            .set_name(Self::EXCEL_SHEET_NAME)?
+            .set_active(true)
+            .set_header(format!(
+                r#"&C&"Courier New,Bold"{} - &CCreated at &[Date]"#,
+                Self::EXCEL_HEADER_NAME
+            ));
+        self.save_excel_from_worksheet(ws)?;
+
+        let buff = wb.save_to_buffer().map_err(crate::DynoErr::excel_error)?;
+        writer.write_all(&buff).map_err(From::from)
+    }
+    fn open_excel_from_path<P: AsRef<std::path::Path>>(path: P) -> crate::DynoResult<Self> {
+        let file = std::io::BufReader::new(std::fs::File::open(path)?);
+        Self::open_excel_from_reader(file).map_err(From::from)
+    }
+    fn save_excel_from_path<P: AsRef<std::path::Path>>(&self, path: P) -> crate::DynoResult<()> {
+        let mut file = std::io::BufWriter::new(std::fs::File::create(path)?);
+        self.save_excel_from_writer(&mut file).map_err(From::from)
+    }
+}

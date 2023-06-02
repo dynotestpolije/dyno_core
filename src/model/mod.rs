@@ -13,7 +13,8 @@ crate::decl_constants!(
 #[display(fmt = "UserSession {{ id:{id}, role:{role} }}")]
 #[derive(Debug, Clone)]
 pub struct UserSession {
-    pub id: uuid::Uuid,
+    pub id: i32,
+    pub uuid: uuid::Uuid,
     pub role: role::Roles,
 }
 
@@ -47,10 +48,9 @@ pub enum ResponseStatus {
     Error,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, derive_more::Display)]
-#[display(fmt = "response_json {{ payload: {payload}, status: {status} }}")]
-#[derive(Debug, Clone)]
-pub struct ApiResponse<T: std::fmt::Display> {
+#[cfg_attr(debug_assert, derive(Debug))]
+#[derive(serde::Deserialize, serde::Serialize, Clone)]
+pub struct ApiResponse<T> {
     pub payload: T,
     pub status: ResponseStatus,
 }
@@ -59,7 +59,6 @@ impl<T> ApiResponse<T>
 where
     T: serde::ser::Serialize,
     T: serde::de::DeserializeOwned,
-    T: std::fmt::Display,
 {
     pub fn success(payload: T) -> Self {
         Self {

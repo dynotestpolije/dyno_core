@@ -1,11 +1,5 @@
-use std::{
-    fs::File,
-    io::{BufRead, BufReader, BufWriter, Write},
-    path::Path,
-};
-
 use crate::{
-    convertions::prelude::*, Buffer, DynoErr, DynoResult, Float, InfoMotor, MotorType, Numeric,
+    convertions::prelude::*, Buffer, CsvSaver, ExcelSaver, Float, InfoMotor, MotorType, Numeric,
     Stroke,
 };
 use chrono::{NaiveDateTime, Utc};
@@ -25,26 +19,26 @@ pub struct Data {
     pub percepatan_roller: MetresPerSecond,
 }
 impl Data {
-    const SIZE_IDX: usize = 7;
     pub fn from_serial(
         last: &'_ Self,
         config: &'_ crate::config::DynoConfig,
         serial_data: super::SerialData,
     ) -> Self {
         let super::SerialData {
-            time: _,
             period,
-            pulse_enc_max: pulse_encoder_max,
-            pulse_enc: pulse_encoder,
+            pulse_enc_max,
+            pulse_enc,
             pulse_rpm,
             temperature,
-            pulse_enc_raw: _,
-            pulse_enc_z: _,
+            ..
         } = serial_data;
 
         let delta_ms = period as Float;
 
-        let putaran = pulse_encoder as Float / pulse_encoder_max as Float;
+        // let pulse_enc = if pulse_enc > 2_000_000 {
+        // } else {
+        // }
+        let putaran = pulse_enc as Float / pulse_enc_max as Float;
 
         let jarak_tempuh_roller = config.keliling_roller * putaran;
         let odo = jarak_tempuh_roller.to_kilometres().if_not_normal(last.odo);
@@ -123,7 +117,7 @@ impl Data {
 
     #[cfg(feature = "use_excel")]
     pub fn from_row_excel(row: &'_ [calamine::DataType]) -> Option<Self> {
-        if row.len() < Self::SIZE_IDX {
+        if row.len() < BufferData::SIZE_IDX {
             return None;
         };
         let mut row_iter = row.iter();
@@ -154,8 +148,8 @@ impl Data {
         })
     }
 
-    pub fn from_line_delim<S: AsRef<str>>(line_str: S, delim: &'_ str) -> Option<Self> {
-        let mut itw = line_str.as_ref().split(delim);
+    pub fn from_line_delim<S: AsRef<str>>(line_str: S) -> Option<Self> {
+        let mut itw = line_str.as_ref().split(BufferData::CSV_DELIMITER);
         let mut pnext = || itw.next().and_then(|x| x.parse::<Float>().ok());
 
         let speed = pnext()?.into();
@@ -341,37 +335,29 @@ impl BufferData {
     }
 }
 
-impl BufferData {
+impl CsvSaver for BufferData {
     const CSV_DELIMITER: &'static str = ",";
 
-    pub fn open_from_csv<P: AsRef<Path>>(path: P) -> DynoResult<Self> {
+    fn open_csv_from_reader<R: std::io::BufRead>(reader: R) -> crate::DynoResult<Self> {
         let mut slf = Self::default();
-        let mut lines = BufReader::new(File::open(path)?).lines();
-        let _header = lines.next();
-        for line in lines {
-            match line {
-                Ok(line) => match Data::from_line_delim(line, Self::CSV_DELIMITER) {
-                    Some(d) => slf.push_data(d),
-                    None => continue,
-                },
-                Err(err) => {
-                    log::error!("Failed to get line from csv - {err}");
-                    continue;
-                }
-            }
-        }
+        reader
+            .lines()
+            .map_while(Result::ok)
+            .filter_map(Data::from_line_delim)
+            .for_each(|data| {
+                slf.push_data(data);
+            });
         Ok(slf)
     }
 
-    pub fn save_as_csv<P: AsRef<Path>>(&self, path: P) -> DynoResult<()> {
-        let mut writer = BufWriter::new(File::create(path)?);
+    fn save_csv_from_writer<W: std::io::Write>(&self, writer: &mut W) -> crate::DynoResult<()> {
         writeln!(
-            &mut writer,
+            writer,
             "SPEED,RPM(RODA),RPM(ENGINE),TORQUE,HORSEPOWER,TEMP,TIME"
         )?;
         for idx in 0usize..self.len {
             writeln!(
-                &mut writer,
+                writer,
                 "{speed},{rpm_roda},{rpm_engine},{torque},{horsepower},{temp},{time}",
                 speed = self.speed[idx],
                 rpm_roda = self.rpm_roda[idx],
@@ -388,18 +374,22 @@ impl BufferData {
 }
 
 #[cfg(feature = "use_excel")]
-impl BufferData {
+impl ExcelSaver for BufferData {
+    const SIZE_IDX: usize = 7;
     const EXCEL_SHEET_NAME: &'static str = "dynotest";
     const EXCEL_HEADER_NAME: &'static str = "Dynotest Data Table";
 
-    pub fn open_from_excel<P: AsRef<Path>>(path: P) -> DynoResult<Self> {
-        use calamine::Reader;
+    fn open_excel_from_worksheet<R>(mut workbook: calamine::Xlsx<R>) -> crate::DynoResult<Self>
+    where
+        R: std::io::Read + std::io::Seek,
+    {
         let mut slf = Self::default();
-        let mut wb = calamine::open_workbook_auto(path)?;
-        let wb_range = match wb.worksheet_range(Self::EXCEL_SHEET_NAME) {
+        use calamine::Reader;
+
+        let wb_range = match workbook.worksheet_range(Self::EXCEL_SHEET_NAME) {
                 Some(Ok(range)) => range,
-                Some(Err(err)) => return Err(From::from(err)),
-                None => return Err(DynoErr::excel_error(
+                Some(Err(err)) => return Err(crate::DynoErr::excel_error(err)),
+                None => return Err(crate::DynoErr::excel_error(
                     format!("Worksheet `{}` not exists, please add or change the worksheet name to open succesfully open the file", Self::EXCEL_SHEET_NAME),
                 ))
             };
@@ -412,30 +402,33 @@ impl BufferData {
         Ok(slf)
     }
 
-    pub fn save_as_excel<P: AsRef<Path>>(&self, path: P) -> DynoResult<()> {
+    fn save_excel_from_worksheet(
+        &self,
+        worksheet: &mut rust_xlsxwriter::Worksheet,
+    ) -> crate::DynoResult<()> {
         use rust_xlsxwriter::*;
+
         let format_header = Format::new().set_bold().set_border(FormatBorder::Medium);
         let date_format = Format::new().set_num_format("dd/mm/yyyy hh:mm AM/PM");
-
-        let mut wb = Workbook::new();
-        let mut ws = Worksheet::new();
-        ws.set_name(Self::EXCEL_SHEET_NAME)?.set_active(true);
-        let header = format!(
-            r#"&C&"Courier New,Bold"{} - &CCreated at &[Date]"#,
-            Self::EXCEL_HEADER_NAME
-        );
-
-        ws.set_header(&header);
         for col in 0..Self::MAX_COLS_SIZE {
-            ws.write_string_with_format(0, col as _, Self::BUFFER_NAME[col], &format_header)?;
+            worksheet.write_string_with_format(
+                0,
+                col as _,
+                Self::BUFFER_NAME[col],
+                &format_header,
+            )?;
             match col {
                 0 => self.speed.iter().enumerate().for_each(|(index, value)| {
-                    if let Err(err) = ws.write_number((index + 1) as _, col as _, value.to_f64()) {
+                    if let Err(err) =
+                        worksheet.write_number((index + 1) as _, col as _, value.to_f64())
+                    {
                         log::error!("{err}")
                     }
                 }),
                 1 => self.rpm_roda.iter().enumerate().for_each(|(index, value)| {
-                    if let Err(err) = ws.write_number((index + 1) as _, col as _, value.to_f64()) {
+                    if let Err(err) =
+                        worksheet.write_number((index + 1) as _, col as _, value.to_f64())
+                    {
                         log::error!("{err}")
                     }
                 }),
@@ -445,14 +438,16 @@ impl BufferData {
                     .enumerate()
                     .for_each(|(index, value)| {
                         if let Err(err) =
-                            ws.write_number((index + 1) as _, col as _, value.to_f64())
+                            worksheet.write_number((index + 1) as _, col as _, value.to_f64())
                         {
                             log::error!("{err}")
                         }
                     }),
 
                 3 => self.torque.iter().enumerate().for_each(|(index, value)| {
-                    if let Err(err) = ws.write_number((index + 1) as _, col as _, value.to_f64()) {
+                    if let Err(err) =
+                        worksheet.write_number((index + 1) as _, col as _, value.to_f64())
+                    {
                         log::error!("{err}")
                     }
                 }),
@@ -463,14 +458,16 @@ impl BufferData {
                     .enumerate()
                     .for_each(|(index, value)| {
                         if let Err(err) =
-                            ws.write_number((index + 1) as _, col as _, value.to_f64())
+                            worksheet.write_number((index + 1) as _, col as _, value.to_f64())
                         {
                             log::error!("{err}")
                         }
                     }),
 
                 5 => self.temp.iter().enumerate().for_each(|(index, value)| {
-                    if let Err(err) = ws.write_number((index + 1) as _, col as _, value.to_f64()) {
+                    if let Err(err) =
+                        worksheet.write_number((index + 1) as _, col as _, value.to_f64())
+                    {
                         log::error!("{err}")
                     }
                 }),
@@ -484,9 +481,12 @@ impl BufferData {
                             Some(k) => k,
                             None => Default::default(),
                         };
-                        if let Err(err) =
-                            ws.write_datetime((index + 1) as _, col as _, &date_time, &date_format)
-                        {
+                        if let Err(err) = worksheet.write_datetime(
+                            (index + 1) as _,
+                            col as _,
+                            &date_time,
+                            &date_format,
+                        ) {
                             log::error!("{err}")
                         }
                     }),
@@ -502,8 +502,6 @@ impl BufferData {
         //     series.set_values((Self::EXCEL_SHEET_NAME, 1, col + 1, max_row, col + 1));
         // }
         // ws.insert_chart(1, (Self::MAX_COLS_SIZE + 2) as _, &chart)?;
-
-        wb.push_worksheet(ws);
-        wb.save(path).map_err(From::from)
+        Ok(())
     }
 }

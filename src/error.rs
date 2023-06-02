@@ -10,6 +10,7 @@ macro_rules! impl_from_to_string {
         )*
     };
 }
+
 macro_rules! impl_err_kind {
     ($structs:ty => [ $( $($m:literal)? $name:ident ),* $(,)?]) => {
         impl<'a> $structs {
@@ -17,7 +18,10 @@ macro_rules! impl_err_kind {
                 $(#[cfg(feature = $m)])?
                 #[allow(unused)]
                 #[inline(always)]
-                #[doc(hidden)]
+                #[doc = concat!(
+                    "helper function to create an error with `ErrorKind::",
+                    stringify!($name), "`, with parameter that implements `ToString` std traits"
+                )]
                 pub fn [< $name:snake _error>]<S: ToString>(desc: S) -> Self {
                     Self {
                         desc: desc.to_string(),
@@ -28,7 +32,11 @@ macro_rules! impl_err_kind {
                 $(#[cfg(feature = $m)])?
                 #[allow(unused)]
                 #[inline(always)]
-                #[doc(hidden)]
+                #[doc = concat!(
+                    "helper function to check if the error is kind of 'ErrorKind::",
+                    stringify!($name),
+                    "`, return `bool` to indicate is the right kind"
+                )]
                 pub const fn [<is_ $name:snake _error>](&self) -> bool {
                     matches!(self.kind, ErrKind::$name)
                 }
@@ -52,28 +60,25 @@ pub enum ErrKind {
     #[cfg(feature = "backend")]
     NotImplemented,
     #[cfg(feature = "backend")]
+    ExpectationFailed,
+    #[cfg(feature = "backend")]
     Database,
-    #[cfg(feature = "use_crypto")]
+    #[cfg(feature = "password_hashing")]
     PasswordHash,
-    #[cfg(feature = "use_crypto")]
+    #[cfg(feature = "checksum")]
     Checksum,
-    #[cfg(feature = "use_crypto")]
+    #[cfg(feature = "jwt_encode_decode")]
     Jwt,
-
-
-    SendRequest,
-    Api,
-
     #[cfg(feature = "use_excel")]
     Excel,
-
     #[cfg(feature = "use_async")]
     AsyncTask,
-
+    Uuid,
+    SendRequest,
+    Api,
     Serialize,
     Deserialize,
     Plotters,
-
     Filesystem,
     InputOutput,
     SerialPort,
@@ -95,8 +100,23 @@ pub struct DynoErr {
 }
 
 impl_err_kind!(DynoErr => [
-    Filesystem, InputOutput,SerialPort, Logger, Service, Serde, Parsing,Any,
-    EncodingDecoding, Validation, Serialize, Deserialize, Unknown, SendRequest, Api, Plotters,
+    Filesystem,
+    InputOutput,
+    SerialPort,
+    Logger,
+    Service,
+    Serde,
+    Parsing,
+    Uuid,
+    Any,
+    EncodingDecoding,
+    Validation,
+    Serialize,
+    Deserialize,
+    Unknown,
+    SendRequest,
+    Api,
+    Plotters,
     "backend" InternalServer,
     "backend" BadRequest,
     "backend" Unauthorized,
@@ -104,9 +124,10 @@ impl_err_kind!(DynoErr => [
     "backend" UnsupportedMediaType,
     "backend" NotImplemented,
     "backend" Database,
-    "use_crypto" PasswordHash,
-    "use_crypto" Jwt,
-    "use_crypto" Checksum,
+    "backend" ExpectationFailed,
+    "password_hashing" PasswordHash,
+    "jwt_encode_decode" Jwt,
+    "checksum" Checksum,
     "use_excel" Excel,
     "use_async" AsyncTask,
 ]);
@@ -137,44 +158,30 @@ unsafe impl Send for DynoErr {}
 unsafe impl Sync for DynoErr {}
 
 impl_from_to_string!(DynoErr => [
-    "use_anyhow"    anyhow::Error                                       as Any,
     "use_excel"     calamine::Error                                     as Excel,
     "use_excel"     rust_xlsxwriter::XlsxError                          as Excel,
     "use_async"     tokio::task::JoinError                              as AsyncTask,
+    "frontend"      reqwest::Error                                      as Service,
+                    uuid::Error                                         as Uuid,
                     Box<bincode::ErrorKind>                             as EncodingDecoding,
                     toml::de::Error                                     as Deserialize,
                     toml::ser::Error                                    as Serialize,
                     serde_json::Error                                   as Deserialize,
-                    &'static str                                        as Any,
-                    String                                              as Any,
-                    Box<dyn std::error::Error>                          as Any,
-                    Box<dyn std::error::Error + Send + Sync>            as Any,
                     std::io::Error                                      as InputOutput,
                     core::num::ParseIntError                            as Parsing,
                     core::num::ParseFloatError                          as Parsing,
                     std::env::VarError                                  as InputOutput,
+                    &'static str                                        as Any,
+                    String                                              as Any,
+                    Box<dyn std::error::Error>                          as Any,
+                    Box<dyn std::error::Error + Send + Sync + 'static>  as Any,
 ]);
-
-impl<T: ToString> From<std::sync::mpsc::SendError<T>> for DynoErr {
-    fn from(value: std::sync::mpsc::SendError<T>) -> Self {
-        Self::input_output_error(value)
-    }
-}
-
-#[cfg(feature = "use_plotters")]
-impl<E> From<plotters::drawing::DrawingAreaErrorKind<E>> for DynoErr
-where
-    E: std::error::Error + Send + Sync,
-{
-    fn from(value: plotters::drawing::DrawingAreaErrorKind<E>) -> Self {
-        Self::plotters_error(value)
-    }
-}
 
 pub type DynoResult<T> = ::core::result::Result<T, DynoErr>;
 
 #[cfg(feature = "backend")]
 impl actix_web::error::ResponseError for DynoErr {
+    #[inline]
     fn status_code(&self) -> actix_web::http::StatusCode {
         use actix_web::http::StatusCode;
         match self.kind {
@@ -183,6 +190,8 @@ impl actix_web::error::ResponseError for DynoErr {
             ErrKind::Forbidden => StatusCode::FORBIDDEN,
             ErrKind::UnsupportedMediaType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
             ErrKind::NotImplemented => StatusCode::NOT_IMPLEMENTED,
+            ErrKind::InternalServer => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrKind::ExpectationFailed => StatusCode::EXPECTATION_FAILED,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -223,9 +232,8 @@ where
 #[macro_export]
 macro_rules! ignore_err {
     ($err:expr) => {
-        match $err {
-            Ok(_) => (),
-            Err(err) => $crate::log::error!("ERROR[IGNORED]: {err}"),
+        if let Err(err) = $err {
+            $crate::log::error!("ERROR[IGNORED]: {err}");
         }
     };
 }

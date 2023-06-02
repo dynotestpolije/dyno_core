@@ -164,16 +164,21 @@ impl Default for MotorType {
 }
 
 impl MotorType {
-    pub fn is_electric(self) -> bool {
+    pub fn name(&self) -> String {
+        match self {
+            MotorType::Electric(i) => i.name.clone(),
+            MotorType::Engine(i) => i.name.clone(),
+        }
+    }
+    pub fn is_electric(&self) -> bool {
         matches!(self, Self::Electric(_))
     }
 
-    pub fn is_engine(self) -> bool {
+    pub fn is_engine(&self) -> bool {
         matches!(self, Self::Engine(_))
     }
 }
 
-#[cfg_attr(feature = "backend", derive(sqlx::FromRow))]
 #[derive(Debug, Clone, derive_more::Display, serde::Deserialize, serde::Serialize)]
 #[display(fmt = "[name: {name}]")]
 pub struct ElectricMotor {
@@ -188,7 +193,6 @@ impl Default for ElectricMotor {
     }
 }
 
-#[cfg_attr(feature = "backend", derive(sqlx::FromRow))]
 #[derive(Debug, Clone, derive_more::Display, serde::Deserialize, serde::Serialize)]
 #[display(fmt = "[{name} - {cc}|{cylinder}|{stroke}]")]
 #[serde(default)]

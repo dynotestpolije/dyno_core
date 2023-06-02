@@ -6,13 +6,17 @@ use std::fs::File;
 use std::io::{self, BufWriter};
 use std::io::{Stderr, Write};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Mutex;
 use std::time::SystemTime;
 
 use crate::{DynoErr, DynoResult};
-
+#[cfg(feature = "frontend")]
 lazy_static::lazy_static! {
     pub static ref RECORDS_LOGGER: Mutex<Vec<(Level, String)>> = Default::default();
+}
+
+lazy_static::lazy_static! {
     static ref LOGGER: DynoLogger = DynoLogger::default();
 }
 
@@ -71,8 +75,12 @@ impl Log for DynoLogger {
                     args,
                 ),
             );
-            if let Ok(mut locked) = RECORDS_LOGGER.lock() {
-                locked.push((level, format!("[{}]::[{:6}] - {}", target, level, args)));
+
+            #[cfg(feature = "frontend")]
+            {
+                if let Ok(mut locked) = RECORDS_LOGGER.lock() {
+                    locked.push((level, format!("[{}]::[{:6}] - {}", target, level, args)));
+                }
             }
         }
     }
@@ -262,8 +270,16 @@ impl LoggerBuilder {
 
     pub fn build_console_logger(self) -> DynoResult<()> {
         LOGGER.renew(Box::new(ConsoleLogger::new()))?;
-
         log::set_max_level(self.max_level);
+        if let Some(level) = std::env::var_os("RUST_LOG") {
+            log::set_max_level(
+                level
+                    .to_str()
+                    .map(|x| LevelFilter::from_str(x).unwrap_or(self.max_level))
+                    .unwrap_or(self.max_level),
+            );
+        }
+
         log::set_logger(&*LOGGER).map_err(DynoErr::logger_error)
     }
 

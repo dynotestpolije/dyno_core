@@ -3,27 +3,30 @@
 mod config;
 mod error;
 mod ext;
-mod logger;
 mod macros;
 mod validator;
 
 #[cfg(feature = "use_plot")]
 mod ploting;
 
+#[cfg(feature = "use_log")]
+mod logger;
+
 pub mod convertions;
 pub mod data_structure;
 pub mod model;
 
-#[cfg(feature = "use_crypto")]
 pub mod crypto;
 
 #[cfg(feature = "use_plot")]
 pub use ploting::*;
 
+#[cfg(feature = "use_log")]
+pub use logger::*;
+
 pub use config::*;
 pub use error::*;
 pub use ext::*;
-pub use logger::*;
 pub use validator::*;
 
 pub use convertions::prelude::*;
@@ -44,14 +47,13 @@ pub use uuid;
 #[cfg(feature = "use_chrono")]
 pub use chrono;
 
-#[cfg(feature = "use_log")]
 pub use log;
 
 #[cfg(feature = "use_regex")]
 pub use regex;
 
-#[cfg(feature = "backend")]
-pub use actix_web;
+// #[cfg(feature = "backend")]
+// pub use actix_web;
 
 #[cfg(feature = "use_async")]
 pub use tokio;

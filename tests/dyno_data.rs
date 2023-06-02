@@ -7,13 +7,11 @@ const SIZE_TESTED: usize = 1000;
 const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
 const SER_DATA: SerialData = SerialData {
-    time: 1000,
     pulse_enc: 4200,
     pulse_rpm: 69,
     temperature: 420f32,
     pulse_enc_max: 360,
     period: 200,
-    pulse_enc_raw: 4200 / 4,
     pulse_enc_z: 4200 / 360,
 };
 
@@ -77,7 +75,7 @@ fn test_data_buffer() {
 fn test_save_compressed() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.dyno");
     if !path.exists() {
-        match DEFAULT_DATA_BUFFER.compress_to_file(&path) {
+        match DEFAULT_DATA_BUFFER.compress_to_path(&path) {
             Ok(k) => k,
             Err(err) => panic!("ERROR: {err}"),
         }
@@ -87,7 +85,7 @@ fn test_save_compressed() {
 fn test_open_compressed() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_bin.dyno");
     std::thread::sleep(std::time::Duration::from_secs(1));
-    let buffer_data = match BufferData::decompress_from_file(path) {
+    let buffer_data = match BufferData::decompress_from_path(path) {
         Ok(ok) => ok,
         Err(err) => panic!("ERROR: {err}"),
     };
@@ -105,7 +103,7 @@ fn test_compressed_data_buffer() {
 fn test_save_csv() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_csv.csv");
     if !path.exists() {
-        match DEFAULT_DATA_BUFFER.save_as_csv(&path) {
+        match DEFAULT_DATA_BUFFER.save_csv_from_path(&path) {
             Ok(k) => k,
             Err(err) => panic!("{err}"),
         }
@@ -118,7 +116,7 @@ fn test_open_csv() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_csv.csv");
     std::thread::sleep(std::time::Duration::from_secs(1));
     assert!(path.exists());
-    let buffer_data = match BufferData::open_from_csv(&path) {
+    let buffer_data = match BufferData::open_csv_from_path(&path) {
         Ok(k) => k,
         Err(err) => panic!("ERROR: {err}"),
     };
@@ -136,7 +134,7 @@ fn test_csv_data_buffer() {
 fn test_save_excel() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_excel.xlsx");
     if !path.exists() {
-        match DEFAULT_DATA_BUFFER.save_as_excel(&path) {
+        match DEFAULT_DATA_BUFFER.save_excel_from_path(&path) {
             Ok(k) => k,
             Err(err) => panic!("ERROR: {err}"),
         }
@@ -149,7 +147,7 @@ fn test_open_excel() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_excel.xlsx");
     std::thread::sleep(std::time::Duration::from_secs(1));
     assert!(path.exists());
-    let buffer_data = match BufferData::open_from_excel(&path) {
+    let buffer_data = match BufferData::open_excel_from_path(&path) {
         Ok(k) => k,
         Err(err) => panic!("ERROR: {err}"),
     };

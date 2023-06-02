@@ -6,9 +6,11 @@
 
 use std::path::{Path, PathBuf};
 
-use plotly::common::{Line, LineShape};
-use plotly::layout::{Axis, RangeSelector, RangeSlider, SelectorButton, SelectorStep, StepMode};
-use plotly::{Layout, Plot};
+use plotly::{
+    common::{Line, LineShape},
+    layout::{Axis, RangeSelector, RangeSlider, SelectorButton, SelectorStep, StepMode},
+    Layout, Plot,
+};
 
 use crate::{BufferData, DynoResult};
 
@@ -69,11 +71,7 @@ impl DynoPlot {
 }
 impl DynoPlot {
     pub fn create_all(mut self, data: &BufferData) -> DynoResult<()> {
-        self.plot.add_trace(data.get_trace(
-            0,
-            &data.time_stamp,
-            Line::new().shape(LineShape::Spline),
-        ));
+        self.add_trace(data.get_trace(0, &data.time_stamp, Line::new().shape(LineShape::Spline)));
         (1..=3).for_each(|i| {
             self.plot.add_trace(
                 data.get_trace(i, &data.time_stamp, Line::new().shape(LineShape::Spline))
@@ -108,8 +106,7 @@ impl DynoPlot {
                         SelectorButton::new().step(SelectorStep::All),
                     ])),
         );
-        self.plot.set_layout(layout);
-
+        self.set_layout(layout);
         Ok(())
     }
 }
