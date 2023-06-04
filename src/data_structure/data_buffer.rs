@@ -1,6 +1,5 @@
 use crate::{
-    convertions::prelude::*, Buffer, CsvSaver, ExcelSaver, Float, InfoMotor, MotorType, Numeric,
-    Stroke,
+    convertions::prelude::*, Buffer, CsvSaver, Float, InfoMotor, MotorType, Numeric, Stroke,
 };
 use chrono::{NaiveDateTime, Utc};
 
@@ -117,7 +116,7 @@ impl Data {
 
     #[cfg(feature = "use_excel")]
     pub fn from_row_excel(row: &'_ [calamine::DataType]) -> Option<Self> {
-        if row.len() < BufferData::SIZE_IDX {
+        if row.len() < <BufferData as crate::ExcelSaver>::SIZE_IDX {
             return None;
         };
         let mut row_iter = row.iter();
@@ -374,7 +373,7 @@ impl CsvSaver for BufferData {
 }
 
 #[cfg(feature = "use_excel")]
-impl ExcelSaver for BufferData {
+impl crate::ExcelSaver for BufferData {
     const SIZE_IDX: usize = 7;
     const EXCEL_SHEET_NAME: &'static str = "dynotest";
     const EXCEL_HEADER_NAME: &'static str = "Dynotest Data Table";

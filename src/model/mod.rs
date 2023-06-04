@@ -11,7 +11,7 @@ crate::decl_constants!(
 
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display)]
 #[display(fmt = "UserSession {{ id:{id}, role:{role} }}")]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UserSession {
     pub id: i32,
     pub uuid: uuid::Uuid,

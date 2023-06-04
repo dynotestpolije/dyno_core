@@ -198,7 +198,7 @@ impl actix_web::error::ResponseError for DynoErr {
     #[inline]
     fn error_response(&self) -> actix_web::HttpResponse {
         actix_web::HttpResponse::build(self.status_code())
-            .json(crate::model::ApiResponse::error(self.to_string()))
+            .json(crate::model::ApiResponse::error(self.clone()))
     }
 }
 

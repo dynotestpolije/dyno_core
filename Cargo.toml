@@ -16,12 +16,14 @@ publish = false
 default     = ["dep:log", "use_chrono", "dep:uuid"]
 
 backend         = ["dep:actix-web", "use_crypto"]
-frontend        = ["dep:reqwest", "use_async", "use_excel", "use_log"]
+frontend        = ["dep:reqwest"]
+use_wasm        = ["uuid?/v7", "uuid?/js"]
 use_excel       = ["dep:calamine", "dep:rust_xlsxwriter"]
 use_regex       = ["dep:regex"]
 use_chrono      = ["dep:chrono"]
 use_plot        = ["dep:plotly"]
-use_async       = ["dep:tokio", "dep:crossbeam-channel"]
+use_async       = ["use_tokio", "dep:crossbeam-channel"]
+use_tokio       = ["dep:tokio"]
 use_crypto      = ["password_hashing", "jwt_encode_decode", "checksum"]
 
 password_hashing  = ["dep:argon2", "dep:rand_core"]
