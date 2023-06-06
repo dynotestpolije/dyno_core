@@ -11,7 +11,6 @@
     Ord,
 )]
 pub enum Stroke {
-    Unknown = 0,
     Two = 2,
 
     #[default]
@@ -19,7 +18,7 @@ pub enum Stroke {
 }
 impl Stroke {
     pub fn into_iter() -> impl Iterator<Item = Self> {
-        [Self::Unknown, Self::Two, Self::Four].into_iter()
+        [Self::Two, Self::Four].into_iter()
     }
 }
 
@@ -27,7 +26,6 @@ impl std::fmt::Display for Stroke {
     #[inline(always)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
-            Stroke::Unknown => write!(f, "Unknown Stroke"),
             Stroke::Two => write!(f, "Two Stroke"),
             Stroke::Four => write!(f, "Four Stroke"),
         }
@@ -40,7 +38,7 @@ impl From<u8> for Stroke {
         match val {
             2 => Self::Two,
             4 => Self::Four,
-            _ => Self::Unknown,
+            _ => Self::default(),
         }
     }
 }
@@ -104,9 +102,8 @@ impl From<u8> for Transmition {
     Ord,
 )]
 pub enum Cylinder {
-    Unknown = 0,
     #[default]
-    Single,
+    Single = 1,
     Two,
     Triple,
     Four,
@@ -115,9 +112,6 @@ pub enum Cylinder {
 }
 
 impl Cylinder {
-    pub fn not_unkown(self) -> bool {
-        !matches!(self, Self::Unknown)
-    }
     pub fn into_iter() -> impl Iterator<Item = Self> {
         [
             Self::Single,
@@ -126,7 +120,6 @@ impl Cylinder {
             Self::Four,
             Self::Six,
             Self::Eight,
-            Self::Unknown,
         ]
         .into_iter()
     }
@@ -141,7 +134,6 @@ impl std::fmt::Display for Cylinder {
             Cylinder::Four => write!(f, "Four Cylinder"),
             Cylinder::Six => write!(f, "Six Cylinder"),
             Cylinder::Eight => write!(f, "Eight Cylinder"),
-            Cylinder::Unknown => write!(f, "Unknown Cylinder"),
         }
     }
 }
@@ -154,7 +146,7 @@ impl From<u8> for Cylinder {
             4 => Cylinder::Four,
             6 => Cylinder::Six,
             8 => Cylinder::Eight,
-            _ => Cylinder::Unknown,
+            _ => Cylinder::default(),
         }
     }
 }
@@ -172,11 +164,17 @@ impl Default for MotorType {
 }
 
 impl MotorType {
-    pub fn is_electric(self) -> bool {
+    pub fn name(&self) -> String {
+        match self {
+            MotorType::Electric(i) => i.name.clone(),
+            MotorType::Engine(i) => i.name.clone(),
+        }
+    }
+    pub fn is_electric(&self) -> bool {
         matches!(self, Self::Electric(_))
     }
 
-    pub fn is_engine(self) -> bool {
+    pub fn is_engine(&self) -> bool {
         matches!(self, Self::Engine(_))
     }
 }

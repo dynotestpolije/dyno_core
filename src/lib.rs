@@ -1,21 +1,37 @@
 #![allow(unused_comparisons)]
 
 mod config;
-mod data_structure;
 mod error;
 mod ext;
-mod logger;
 mod macros;
 mod validator;
 
+#[cfg(feature = "use_plot")]
+mod ploting;
+
+#[cfg(feature = "use_log")]
+mod logger;
+
 pub mod convertions;
+pub mod data_structure;
+pub mod model;
+
+pub mod crypto;
+
+#[cfg(feature = "use_plot")]
+pub use ploting::*;
+
+#[cfg(feature = "use_log")]
+pub use logger::*;
 
 pub use config::*;
-pub use data_structure::*;
 pub use error::*;
 pub use ext::*;
-pub use logger::*;
 pub use validator::*;
+
+pub use convertions::prelude::*;
+pub use data_structure::prelude::*;
+pub use model::*;
 
 #[cfg(feature = "default")]
 pub use derive_more;
@@ -28,22 +44,25 @@ pub use toml;
 #[cfg(feature = "default")]
 pub use uuid;
 
-pub mod server;
-pub use server::*;
-
 #[cfg(feature = "use_chrono")]
 pub use chrono;
 
-#[cfg(feature = "use_log")]
 pub use log;
 
 #[cfg(feature = "use_regex")]
 pub use regex;
 
-#[cfg(feature = "backend")]
-pub use actix_web;
-#[cfg(feature = "backend")]
-pub use sqlx;
+// #[cfg(feature = "backend")]
+// pub use actix_web;
+
+#[cfg(feature = "use_async")]
+pub use tokio;
+
+#[cfg(feature = "use_async")]
+pub use crossbeam_channel;
+
+#[cfg(feature = "frontend")]
+pub use reqwest;
 
 pub use lazy_static;
 
@@ -84,5 +103,45 @@ macro_rules! ternary {
         } else {
             $falsies
         }
+    };
+}
+
+#[macro_export]
+macro_rules! set_builder {
+    (&mut $strc:ident {$($name:ident: $nt:ty),* $(,)? }, $($def:expr)?) => {
+        paste::paste! {
+            #[derive(Default)]
+            pub struct [<$strc Builder>] {
+                data: $strc,
+            }
+            impl [<$strc Builder>] {
+                $(
+                    pub fn $name(&mut self, $name: impl Into<$nt>) -> &mut Self {
+                        self.data.$name = $name.into();
+                        self
+                    }
+                )*
+                pub fn finish(&self) -> $strc {
+                    $strc {
+                        $($name: self.data.$name.clone()),*
+                        $(, $def)?
+                    }
+                }
+            }
+        }
+    };
+}
+
+#[cfg(feature = "use_async")]
+#[macro_export]
+macro_rules! asyncify {
+    (move || $f:expr) => {
+        match $crate::tokio::task::spawn_blocking(move || $f).await {
+            Ok(res) => res.map_err(From::from),
+            Err(_) => Err($crate::DynoErr::async_task_error("background task failed")),
+        }
+    };
+    (async move $f:expr) => {
+        $crate::tokio::spawn(async move { $crate::asyncify!($f) })
     };
 }

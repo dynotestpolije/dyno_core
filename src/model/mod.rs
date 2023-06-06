@@ -11,9 +11,10 @@ crate::decl_constants!(
 
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display)]
 #[display(fmt = "UserSession {{ id:{id}, role:{role} }}")]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct UserSession {
-    pub id: uuid::Uuid,
+    pub id: i32,
+    pub uuid: uuid::Uuid,
     pub role: role::Roles,
 }
 
@@ -21,9 +22,28 @@ pub struct UserSession {
 #[display(fmt = "session {{ sub:{sub} iat:{iat}, exp:{exp} }}")]
 #[derive(Debug, Clone)]
 pub struct TokenClaims {
-    pub sub: UserSession,
-    pub iat: usize,
-    pub exp: usize,
+    pub sub: String,
+    pub id: String,
+    pub exp: i64,
+    pub iat: i64,
+    pub nbf: i64,
+}
+
+impl TokenClaims {
+    #[allow(unused)]
+    pub fn new(id: impl ToString, max_age: i64, sub: impl ToString) -> Self {
+        let now = chrono::Utc::now();
+        let iat = now.timestamp_millis();
+        let nbf = now.timestamp_millis();
+        let exp = (now + chrono::Duration::minutes(max_age as _)).timestamp_millis();
+        Self {
+            id: id.to_string(),
+            sub: sub.to_string(),
+            exp,
+            iat,
+            nbf,
+        }
+    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display)]
@@ -37,10 +57,9 @@ pub enum ResponseStatus {
     Error,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, derive_more::Display)]
-#[display(fmt = "response_json {{ payload: {payload}, status: {status} }}")]
-#[derive(Debug, Clone)]
-pub struct ApiResponse<T: std::fmt::Display> {
+#[cfg_attr(debug_assert, derive(Debug))]
+#[derive(serde::Deserialize, serde::Serialize, Clone)]
+pub struct ApiResponse<T> {
     pub payload: T,
     pub status: ResponseStatus,
 }
@@ -49,25 +68,22 @@ impl<T> ApiResponse<T>
 where
     T: serde::ser::Serialize,
     T: serde::de::DeserializeOwned,
-    T: std::fmt::Display,
 {
-    pub fn success(payload: impl Into<T>) -> Self {
+    pub fn success(payload: T) -> Self {
         Self {
-            payload: payload.into(),
+            payload,
             status: ResponseStatus::Success,
         }
     }
 
-    pub fn status_ok(&self) -> bool {
-        matches!(self.status, ResponseStatus::Success)
-    }
-}
-
-impl ApiResponse<crate::DynoErr> {
-    pub fn error(payload: impl Into<crate::DynoErr>) -> Self {
+    pub fn error(payload: T) -> Self {
         Self {
-            payload: payload.into(),
+            payload,
             status: ResponseStatus::Error,
         }
+    }
+
+    pub const fn status_ok(&self) -> bool {
+        matches!(self.status, ResponseStatus::Success)
     }
 }

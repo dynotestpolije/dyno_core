@@ -9,13 +9,13 @@ pub fn validate_nim(nim: impl AsRef<str>) -> DynoResult<()> {
     let nim = nim.as_ref();
     let count = nim.chars().count();
     if count < 9 && count > 13 {
-        return Err(DynoErr::validate_error(
+        return Err(DynoErr::validation_error(
             "Invalid nim: the lenght of the nim must be greather than 8 or less than 13 character",
         ));
     }
     match nim.chars().next().map(|x| x.is_ascii_alphabetic()) {
         Some(true) => Ok(()),
-        _ => Err(DynoErr::validate_error(
+        _ => Err(DynoErr::validation_error(
             "Invalid nim: the first character in the NIM is not alphabetic!",
         )),
     }
@@ -25,7 +25,7 @@ pub fn validate_nim(nim: impl AsRef<str>) -> DynoResult<()> {
 pub fn validate_email(val: impl AsRef<str>) -> DynoResult<()> {
     let val = val.as_ref();
     if val.is_empty() || !val.contains('@') {
-        return Err(DynoErr::validate_error(
+        return Err(DynoErr::validation_error(
             "Invalid email: email must contains '@'",
         ));
     }
@@ -38,7 +38,7 @@ pub fn validate_email(val: impl AsRef<str>) -> DynoResult<()> {
     // and the max length of the domain part is 255 characters
     // https://datatracker.ietf.org/doc/html/rfc5321#section-4.5.3.1.1
     if user_part.chars().count() > 64 || domain_part.chars().count() > 255 {
-        return Err(DynoErr::validate_error(
+        return Err(DynoErr::validation_error(
             "Invalid email: lenght email must greather than 64 or 255 characters",
         ));
     }
@@ -108,17 +108,17 @@ impl std::fmt::Display for PasswordStrength {
 pub fn validate_password(pswd: impl AsRef<str>) -> DynoResult<()> {
     let pswd = pswd.as_ref();
     if !pswd.is_ascii() {
-        return Err(DynoErr::validate_error(
+        return Err(DynoErr::validation_error(
             "Invalid password: password input harus karakter ASCII!",
         ));
     }
     if pswd.chars().any(|x| x.is_ascii_whitespace()) {
-        return Err(DynoErr::validate_error(
+        return Err(DynoErr::validation_error(
             "Invalid Password: password input memiliki whitespace karakter",
         ));
     }
     if pswd.chars().count() < 8 {
-        return Err(DynoErr::validate_error(
+        return Err(DynoErr::validation_error(
             "Invalid Password: password input harus lebih dari 8 karakter",
         ));
     }

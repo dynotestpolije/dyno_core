@@ -1,10 +1,3 @@
-use crate::AsStr;
-
-#[cfg_attr(
-    feature = "backend",
-    derive(sqlx::Type),
-    sqlx(rename_all = "lowercase")
-)]
 #[derive(
     serde::Deserialize,
     serde::Serialize,
@@ -15,6 +8,9 @@ use crate::AsStr;
     Copy,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
+    Hash,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum Roles {
@@ -42,7 +38,18 @@ impl Roles {
     }
 }
 
-impl AsStr<'static> for Roles {
+impl<S: AsRef<str>> From<S> for Roles {
+    fn from(value: S) -> Self {
+        match value.as_ref() {
+            "admin" => Self::Admin,
+            "user" => Self::User,
+            "guest" => Self::Guest,
+            _ => Self::Guest,
+        }
+    }
+}
+
+impl crate::AsStr<'static> for Roles {
     #[inline]
     fn as_str(&self) -> &'static str {
         match self {
