@@ -27,7 +27,7 @@ use_tokio       = ["dep:tokio"]
 use_crypto      = ["password_hashing", "jwt_encode_decode", "checksum"]
 
 password_hashing  = ["dep:argon2", "dep:rand_core"]
-jwt_encode_decode = ["dep:jsonwebtoken"]
+jwt_encode_decode = ["dep:jsonwebtoken", "dep:base64"]
 checksum          = ["dep:sha2"]
 
 use_log         = []
@@ -50,9 +50,10 @@ reqwest             = { optional = true, version = "^0.11", features = ["json", 
 tokio               = { optional = true, version = "^1.28", features = ["full"] }
 crossbeam-channel   = { optional = true, version = "^0.5" }
 plotly              = { optional = true, version = "^0.8", features = ["kaleido"] }
-calamine            = { optional = true, version = "^0.19", features = ["dates"] }
-rust_xlsxwriter     = { optional = true, version = "^0.39" }
+calamine            = { optional = true, version = "^0.20", features = ["dates"] }
+rust_xlsxwriter     = { optional = true, version = "^0.40" }
 
+base64              = { optional = true, version = "0.21" }
 argon2              = { optional = true, version = "^0.5" } 
 jsonwebtoken        = { optional = true, version = "^8" }
 rand_core           = { optional = true, version = "^0.6", features = ["std"] }

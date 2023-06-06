@@ -8,6 +8,9 @@
     Copy,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
+    Hash,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum Roles {

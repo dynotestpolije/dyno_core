@@ -22,7 +22,9 @@ pub enum OneOrMany<T> {
     Many(Vec<T>),
 }
 
-#[derive(serde::Deserialize, serde::Serialize, derive_more::Display, Debug, Default, Clone)]
+#[derive(
+    serde::Deserialize, serde::Serialize, derive_more::Display, Debug, Default, Clone, PartialEq,
+)]
 #[display(fmt = "UserRegistration {{ nim:{nim}, email:{email:?} }}")]
 pub struct UserRegistration {
     pub nim: String,

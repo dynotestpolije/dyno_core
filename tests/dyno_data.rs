@@ -131,6 +131,7 @@ fn test_csv_data_buffer() {
     test_open_csv();
 }
 
+#[cfg(feature = "use_excel")]
 fn test_save_excel() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_excel.xlsx");
     if !path.exists() {
@@ -143,6 +144,7 @@ fn test_save_excel() {
     assert!(path.is_file());
 }
 
+#[cfg(feature = "use_excel")]
 fn test_open_excel() {
     let path = PathBuf::from(MANIFEST_DIR).join("tests/files/test_excel.xlsx");
     std::thread::sleep(std::time::Duration::from_secs(1));
@@ -156,6 +158,7 @@ fn test_open_excel() {
     asserts_data!(data, 0.0);
 }
 
+#[cfg(feature = "use_excel")]
 #[test]
 fn test_excel_data_buffer() {
     test_save_excel();

@@ -4,7 +4,9 @@ set -eux
 _FLAGS="${1:-}"
 
 if [[ "-d" == ${_FLAGS} ]]; then 
-    cargo test --release --doc --all-features -- -Zunstable-options --report-time 
+    cargo test --release --doc --all-features
+elif [[ "-t" == ${_FLAGS} ]]; then 
+    cargo test --release --all-features "${@:2}"
 else
-    cargo test --release --all-targets --all-features -- -Zunstable-options --report-time
+    cargo test --release --all-targets --all-features
 fi

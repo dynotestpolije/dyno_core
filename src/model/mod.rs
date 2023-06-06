@@ -11,7 +11,7 @@ crate::decl_constants!(
 
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display)]
 #[display(fmt = "UserSession {{ id:{id}, role:{role} }}")]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct UserSession {
     pub id: i32,
     pub uuid: uuid::Uuid,
@@ -22,18 +22,27 @@ pub struct UserSession {
 #[display(fmt = "session {{ sub:{sub} iat:{iat}, exp:{exp} }}")]
 #[derive(Debug, Clone)]
 pub struct TokenClaims {
-    pub sub: UserSession,
-    pub iat: usize,
-    pub exp: usize,
+    pub sub: String,
+    pub id: String,
+    pub exp: i64,
+    pub iat: i64,
+    pub nbf: i64,
 }
 
 impl TokenClaims {
     #[allow(unused)]
-    pub fn new(sub: UserSession) -> Self {
+    pub fn new(id: impl ToString, max_age: i64, sub: impl ToString) -> Self {
         let now = chrono::Utc::now();
-        let iat = now.timestamp_millis() as usize;
-        let exp = (now + chrono::Duration::minutes(120)).timestamp_millis() as usize;
-        Self { sub, exp, iat }
+        let iat = now.timestamp_millis();
+        let nbf = now.timestamp_millis();
+        let exp = (now + chrono::Duration::minutes(max_age as _)).timestamp_millis();
+        Self {
+            id: id.to_string(),
+            sub: sub.to_string(),
+            exp,
+            iat,
+            nbf,
+        }
     }
 }
 
