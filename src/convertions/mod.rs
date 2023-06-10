@@ -94,10 +94,16 @@ macro_rules! declare_std_convertion_type {
             }
         }
 
-        impl From<$crate::Float> for $types {
+        impl From<f32> for $types {
             #[inline(always)]
-            fn from(item: $crate::Float) -> Self {
-                Self(item)
+            fn from(item: f32) -> Self {
+                Self($crate::ext::Numeric::to_float(item))
+            }
+        }
+        impl From<f64> for $types {
+            #[inline(always)]
+            fn from(item: f64) -> Self {
+                Self($crate::ext::Numeric::to_float(item))
             }
         }
 
