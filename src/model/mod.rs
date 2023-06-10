@@ -13,7 +13,7 @@ crate::decl_constants!(
 #[display(fmt = "UserSession {{ id:{id}, role:{role} }}")]
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct UserSession {
-    pub id: i32,
+    pub id: i64,
     pub uuid: uuid::Uuid,
     pub role: role::Roles,
 }

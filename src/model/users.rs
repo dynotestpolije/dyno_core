@@ -5,7 +5,7 @@ use chrono::NaiveDateTime;
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display, Debug, Clone)]
 #[display(fmt = "UserResponse {{ nim:{nim}, name:{name}, email:{email:?}, role:{role} }}")]
 pub struct UserResponse {
-    pub id: i32,
+    pub id: i64,
     pub uuid: uuid::Uuid,
     pub nim: String,
     pub name: String,

@@ -1,3 +1,4 @@
+#[repr(i16)]
 #[derive(
     serde::Deserialize,
     serde::Serialize,
@@ -16,6 +17,7 @@ pub enum Stroke {
     #[default]
     Four = 4,
 }
+
 impl Stroke {
     pub fn into_iter() -> impl Iterator<Item = Self> {
         [Self::Two, Self::Four].into_iter()
@@ -43,6 +45,7 @@ impl From<u8> for Stroke {
     }
 }
 
+#[repr(i8)]
 #[derive(
     serde::Deserialize,
     serde::Serialize,
@@ -88,7 +91,7 @@ impl From<u8> for Transmition {
     }
 }
 
-#[repr(u32)]
+#[repr(i16)]
 #[derive(
     serde::Deserialize,
     serde::Serialize,

@@ -225,7 +225,7 @@ where
     #[inline(always)]
     fn ignore(self) {
         if let Err(err) = self {
-            log::error!("ERROR: {err} [ignored]")
+            log::trace!("ERROR: {err} [ignored]")
         }
     }
 }
@@ -234,7 +234,7 @@ where
 macro_rules! ignore_err {
     ($err:expr) => {
         if let Err(err) = $err {
-            $crate::log::error!("ERROR[IGNORED]: {err}");
+            $crate::log::trace!("ERROR[IGNORED]: {err}");
         }
     };
 }
