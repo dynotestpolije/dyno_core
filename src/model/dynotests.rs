@@ -2,7 +2,7 @@ use crate::DynoConfig;
 use chrono::NaiveDateTime;
 use uuid::Uuid;
 
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, PartialEq, Clone, serde::Deserialize, serde::Serialize)]
 pub struct DynoTest {
     pub id: i64,
     pub user_id: i64,

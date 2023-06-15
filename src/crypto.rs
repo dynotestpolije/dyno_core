@@ -28,7 +28,7 @@ pub fn jwt_encode<T: serde::Serialize>(claims: &T, secret: &'_ [u8]) -> DynoResu
     .map_err(DynoErr::jwt_error)
 }
 
-#[derive(serde::Deserialize, serde::Serialize, derive_more::Display)]
+#[derive(serde::Deserialize, serde::Serialize, derive_more::Display, PartialEq)]
 #[display(
     fmt = "TokenDetails {{ user_id:{user} token_id:{token_id}, expires_in:{expires_in:?}, token:{token:?} }}"
 )]

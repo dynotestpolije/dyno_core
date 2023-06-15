@@ -9,6 +9,8 @@ pub mod prelude {
     pub use super::SerialData;
 }
 
+// macro `repr(C)` agar dapat merepresentasikan struct ini sebagai
+// struct yang sama pada bahasa pemrograman C
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy, serde::Deserialize, derive_more::Display)]
 #[display(fmt = r"SerialData {{ 
@@ -34,6 +36,8 @@ impl SerialData {
 
     #[cfg(not(feature = "use_bincode"))]
     #[inline(always)]
+    // konversi bytes (array of byte) secara menyamakan memory layout
+    // memvalidasi apakah ukuran bytes sama dengan ukuran  data struct
     pub fn from_bytes(bytes: &'_ [u8]) -> Option<Self> {
         if bytes.len() != Self::SIZE {
             return None;
