@@ -1,3 +1,7 @@
+use chrono::{DateTime, Utc};
+
+use crate::DynoConfig;
+
 pub mod dynotests;
 pub mod role;
 pub mod users;
@@ -44,6 +48,13 @@ impl TokenClaims {
             nbf,
         }
     }
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+pub struct ActiveResponse {
+    pub user: Option<users::UserResponse>,
+    pub dyno: Option<DynoConfig>,
+    pub start: DateTime<Utc>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display)]
