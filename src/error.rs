@@ -60,6 +60,8 @@ pub enum ErrKind {
     #[cfg(feature = "backend")]
     NotImplemented,
     #[cfg(feature = "backend")]
+    NotFound,
+    #[cfg(feature = "backend")]
     ExpectationFailed,
     #[cfg(feature = "backend")]
     Database,
@@ -123,6 +125,7 @@ impl_err_kind!(DynoErr => [
     "backend" Forbidden,
     "backend" UnsupportedMediaType,
     "backend" NotImplemented,
+    "backend" NotFound,
     "backend" Database,
     "backend" ExpectationFailed,
     "password_hashing" PasswordHash,
@@ -190,6 +193,7 @@ impl actix_web::error::ResponseError for DynoErr {
             ErrKind::Forbidden => StatusCode::FORBIDDEN,
             ErrKind::UnsupportedMediaType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
             ErrKind::NotImplemented => StatusCode::NOT_IMPLEMENTED,
+            ErrKind::NotFound => StatusCode::NOT_FOUND,
             ErrKind::InternalServer => StatusCode::INTERNAL_SERVER_ERROR,
             ErrKind::ExpectationFailed => StatusCode::EXPECTATION_FAILED,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
