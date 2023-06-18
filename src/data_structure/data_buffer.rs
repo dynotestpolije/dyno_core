@@ -18,11 +18,17 @@ pub struct Data {
     pub percepatan_roller: MetresPerSecond,
 }
 impl Data {
+    pub fn new() -> Self {
+        Self {
+            ..Default::default()
+        }
+    }
+
     pub fn from_serial(
-        last: &'_ Self,
-        config: &'_ crate::config::DynoConfig,
+        &mut self,
+        config: &'_ mut crate::config::DynoConfig,
         serial_data: super::SerialData,
-    ) -> Self {
+    ) {
         let super::SerialData {
             period,
             pulse_enc_max,
@@ -40,15 +46,14 @@ impl Data {
         let putaran = pulse_enc as Float / pulse_enc_max as Float;
 
         let jarak_tempuh_roller = config.keliling_roller * putaran;
-        let odo = jarak_tempuh_roller.to_kilometres().if_not_normal(last.odo);
+        self.odo += jarak_tempuh_roller.to_kilometres();
 
         let percepatan_roller = MetresPerSecond::from_ms(jarak_tempuh_roller, delta_ms);
         let speed = percepatan_roller
             .to_kilometres_per_hour()
-            .if_not_normal(last.speed);
+            .if_not_normal(self.speed);
 
-        let rpm_roda = RotationPerMinute::from_rot(putaran, delta_ms).if_not_normal(last.rpm_roda);
-
+        let rpm_roda = RotationPerMinute::from_rot(putaran, delta_ms).if_not_normal(self.rpm_roda);
         let rpm_engine = match &config.motor_type {
             MotorType::Engine(InfoMotor {
                 cylinder, stroke, ..
@@ -61,34 +66,25 @@ impl Data {
             },
             MotorType::Electric(_) => RotationPerMinute::from_rot(pulse_rpm as Float, delta_ms),
         }
-        .if_not_normal(last.rpm_engine);
+        .if_not_normal(self.rpm_engine);
 
         let percepatan_sudut = rpm_roda.to_radians_per_second();
-
-        let torque = NewtonMeter::new(
-            (config.inertia_roller_beban() * (percepatan_sudut - last.percepatan_sudut).to_float())
+        self.torque = NewtonMeter::new(
+            (config.inertia_roller_beban() * (percepatan_sudut - self.percepatan_sudut).to_float())
                 * config.perbandingan_gear(),
         )
-        .if_negative_normal(last.torque);
+        .if_negative_normal(self.torque);
 
-        let horsepower = HorsePower::from_nm(torque, rpm_roda).if_negative_normal(last.horsepower);
+        self.horsepower =
+            HorsePower::from_nm(self.torque, rpm_roda).if_negative_normal(self.horsepower);
+        self.temp = Celcius::new(temperature).if_not_normal(self.temp);
+        self.time_stamp = Utc::now().naive_local();
 
-        let temp = Celcius::new(temperature).if_not_normal(last.temp);
-
-        let time_stamp = Utc::now().naive_local();
-
-        Self {
-            speed,
-            odo,
-            rpm_roda,
-            rpm_engine,
-            temp,
-            time_stamp,
-            torque,
-            horsepower,
-            percepatan_sudut,
-            percepatan_roller,
-        }
+        self.speed = speed;
+        self.rpm_roda = rpm_roda;
+        self.percepatan_sudut = percepatan_sudut;
+        self.percepatan_roller = percepatan_roller;
+        self.rpm_engine = config.filter_rpm_engine.next(rpm_engine);
     }
 
     pub fn time_duration_formatted(&self, start: chrono::NaiveTime) -> String {
@@ -100,22 +96,9 @@ impl Data {
             dur.num_seconds()
         )
     }
-    #[inline]
-    pub fn from_self(&mut self, other: Self) {
-        self.speed = other.speed;
-        self.odo += other.odo;
-        self.rpm_roda = other.rpm_roda;
-        self.rpm_engine = other.rpm_engine;
-        self.temp = other.temp;
-        self.time_stamp = other.time_stamp;
-        self.torque = other.torque;
-        self.horsepower = other.horsepower;
-        self.percepatan_sudut = other.percepatan_sudut;
-        self.percepatan_roller = other.percepatan_roller;
-    }
 
     #[cfg(feature = "use_excel")]
-    pub fn from_row_excel(row: &'_ [calamine::DataType]) -> Option<Self> {
+    pub fn from_row_excel(&mut self, row: &'_ [calamine::DataType]) -> Option<()> {
         if row.len() < <BufferData as crate::ExcelSaver>::SIZE_IDX {
             return None;
         };
@@ -127,49 +110,30 @@ impl Data {
                     .unwrap_or(x.get_int().unwrap_or_default().to_f64())
             })
         };
-        let speed = next_row()?.into();
-        let rpm_roda = next_row()?.into();
-        let rpm_engine = next_row()?.into();
-        let torque = next_row()?.into();
-        let horsepower = next_row()?.into();
-        let temp = next_row()?.into();
-        let time_stamp = row_iter.next()?.as_datetime()?;
-
-        Some(Self {
-            speed,
-            torque,
-            horsepower,
-            temp,
-            time_stamp,
-            rpm_roda,
-            rpm_engine,
-            ..Default::default()
-        })
+        self.speed = next_row()?.into();
+        self.rpm_roda = next_row()?.into();
+        self.rpm_engine = next_row()?.into();
+        self.torque = next_row()?.into();
+        self.horsepower = next_row()?.into();
+        self.temp = next_row()?.into();
+        self.time_stamp = row_iter.next()?.as_datetime()?;
+        Some(())
     }
 
-    pub fn from_line_delim<S: AsRef<str>>(line_str: S) -> Option<Self> {
+    pub fn from_line_delim<S: AsRef<str>>(&mut self, line_str: S) -> Option<()> {
         let mut itw = line_str.as_ref().split(BufferData::CSV_DELIMITER);
         let mut pnext = || itw.next().and_then(|x| x.parse::<Float>().ok());
 
-        let speed = pnext()?.into();
-        let rpm_roda = pnext()?.into();
-        let rpm_engine = pnext()?.into();
-        let torque = pnext()?.into();
-        let horsepower = pnext()?.into();
-        let temp = pnext()?.into();
-        let time_stamp =
+        self.speed = pnext()?.into();
+        self.rpm_roda = pnext()?.into();
+        self.rpm_engine = pnext()?.into();
+        self.torque = pnext()?.into();
+        self.horsepower = pnext()?.into();
+        self.temp = pnext()?.into();
+        self.time_stamp =
             NaiveDateTime::from_timestamp_millis(itw.next().and_then(|x| x.parse().ok())?)?;
 
-        Some(Data {
-            speed,
-            torque,
-            horsepower,
-            temp,
-            time_stamp,
-            rpm_roda,
-            rpm_engine,
-            ..Default::default()
-        })
+        Some(())
     }
 }
 
@@ -183,7 +147,7 @@ pub struct BufferData {
     pub temp: Buffer<Celcius>,
     pub time_stamp: Buffer<i64>,
 
-    pub last: Data,
+    pub data: Data,
     pub len: usize,
 }
 
@@ -233,33 +197,31 @@ impl BufferData {
         self.len == 0
     }
 
-    #[inline]
-    pub fn push_data(&mut self, data: Data) {
-        self.speed.push(data.speed);
-        self.rpm_roda.push(data.rpm_roda);
-        self.rpm_engine.push(data.rpm_engine);
-        self.torque.push(data.torque);
-        self.horsepower.push(data.horsepower);
-        self.temp.push(data.temp);
+    fn process_data(&mut self) {
+        self.speed.push(self.data.speed);
+        self.rpm_roda.push(self.data.rpm_roda);
+        self.rpm_engine.push(self.data.rpm_engine);
+        self.torque.push(self.data.torque);
+        self.horsepower.push(self.data.horsepower);
+        self.temp.push(self.data.temp);
         self.time_stamp
-            .push(data.time_stamp.timestamp_millis() as _);
-
-        self.last.from_self(data);
+            .push(self.data.time_stamp.timestamp_millis() as _);
         self.len += 1;
     }
 
     #[inline(always)]
     pub fn push_from_serial(
         &mut self,
-        config: &'_ crate::config::DynoConfig,
+        config: &'_ mut crate::config::DynoConfig,
         serial_data: crate::SerialData,
     ) {
-        self.push_data(Data::from_serial(&self.last, config, serial_data));
+        self.data.from_serial(config, serial_data);
+        self.process_data();
     }
 
     #[inline]
     pub fn last(&self) -> &'_ Data {
-        &self.last
+        &self.data
     }
 
     #[inline(always)]
@@ -339,13 +301,13 @@ impl CsvSaver for BufferData {
 
     fn open_csv_from_reader<R: std::io::BufRead>(reader: R) -> crate::DynoResult<Self> {
         let mut slf = Self::default();
-        reader
-            .lines()
-            .map_while(Result::ok)
-            .filter_map(Data::from_line_delim)
-            .for_each(|data| {
-                slf.push_data(data);
-            });
+        reader.lines().map_while(Result::ok).for_each(|line_str| {
+            if slf.data.from_line_delim(line_str).is_some() {
+                slf.process_data();
+            } else {
+                log::error!("Parsing Error: Failed to parse line csv");
+            }
+        });
         Ok(slf)
     }
 
@@ -395,9 +357,13 @@ impl crate::ExcelSaver for BufferData {
         let mut rows_iterator = wb_range.rows();
         // ignore header when reading
         let _header = rows_iterator.next();
-        rows_iterator
-            .filter_map(Data::from_row_excel)
-            .for_each(|d| slf.push_data(d));
+        rows_iterator.for_each(|row_excel| {
+            if slf.data.from_row_excel(row_excel).is_some() {
+                slf.process_data();
+            } else {
+                log::error!("Failed to parse row excel into data");
+            }
+        });
         Ok(slf)
     }
 

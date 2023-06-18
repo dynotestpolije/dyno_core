@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{mem::MaybeUninit, path::PathBuf, sync::Once};
 
 use dyno_core::*;
 use lazy_static::lazy_static;
@@ -15,16 +15,29 @@ const SER_DATA: SerialData = SerialData {
     pulse_enc_z: 4200 / 360,
 };
 
+fn singleton() -> &'static mut dyno_core::DynoConfig {
+    // Create an uninitialized static
+    static mut SINGLETON: MaybeUninit<dyno_core::DynoConfig> = MaybeUninit::uninit();
+    static ONCE: Once = Once::new();
+
+    unsafe {
+        ONCE.call_once(|| {
+            let singleton = dyno_core::DynoConfig::default();
+            SINGLETON.write(singleton);
+        });
+        SINGLETON.assume_init_mut()
+    }
+}
+
 lazy_static! {
     static ref DEFAULT_DATA_BUFFER: BufferData = {
         let mut buffer = BufferData::new();
-        let data = Data::from_serial(buffer.last(), &CONFIG, SER_DATA);
+        let config = singleton();
         for _ in 0..SIZE_TESTED {
-            buffer.push_data(data.clone());
+            buffer.push_from_serial(config, SER_DATA);
         }
         buffer
     };
-    static ref CONFIG: dyno_core::DynoConfig = dyno_core::DynoConfig::default();
 }
 
 macro_rules! asserts_data {
@@ -52,10 +65,10 @@ macro_rules! asserts_data {
         assert_eq!($data.temp, Celcius::new(420.), "data temp asserts");
 
         // TODO: torque and horsepower implementation
-        assert_eq!($data.torque.round_decimal(1), 48.1, "data torque asserts");
+        assert_eq!($data.torque.round_decimal(1), 0.0, "data torque asserts");
         assert_eq!(
             $data.horsepower.round_decimal(1),
-            17.6,
+            0.0,
             "data horsepower asserts"
         );
     }};
@@ -70,6 +83,19 @@ fn test_data_buffer() {
     assert_eq!(DEFAULT_DATA_BUFFER.len(), SIZE_TESTED);
     let data = DEFAULT_DATA_BUFFER.last();
     asserts_data!(data);
+    assert_eq!(
+        DEFAULT_DATA_BUFFER.torque.first_value().round_decimal(1),
+        48.1,
+        "data torque asserts"
+    );
+    assert_eq!(
+        DEFAULT_DATA_BUFFER
+            .horsepower
+            .first_value()
+            .round_decimal(1),
+        17.6,
+        "data horsepower asserts"
+    );
 }
 
 fn test_save_compressed() {
