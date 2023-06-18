@@ -1,6 +1,8 @@
 pub mod buffer;
 pub mod data_buffer;
+mod filter;
 pub mod infomotor;
+pub use filter::ExponentialFilter;
 
 pub mod prelude {
     pub use super::buffer::*;
