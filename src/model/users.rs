@@ -2,7 +2,7 @@ use super::role::Roles;
 use crate::{DynoErr, DynoResult};
 use chrono::NaiveDateTime;
 
-#[derive(serde::Deserialize, serde::Serialize, derive_more::Display, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, derive_more::Display, Debug, Clone, PartialEq)]
 #[display(fmt = "UserResponse {{ nim:{nim}, name:{name}, email:{email:?}, role:{role} }}")]
 pub struct UserResponse {
     pub id: i64,
