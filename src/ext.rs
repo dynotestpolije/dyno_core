@@ -82,6 +82,7 @@ pub trait MinMaxNumeric<Rhs = Self> {
     fn min(self, rhs: Rhs) -> Self;
     fn max(self, rhs: Rhs) -> Self;
 }
+
 /// Implemented for all builtin numeric types
 pub trait Numeric:
     Sized

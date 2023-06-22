@@ -4,7 +4,7 @@ use crate::{
     MotorType, Numeric, RotationPerMinute,
 };
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq)]
 pub struct DynoConfig {
     #[serde(default)]
     pub motor_type: MotorType,

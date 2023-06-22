@@ -68,6 +68,15 @@ pub enum ResponseStatus {
     Error,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct HistoryResponse {
+    pub user_id: i64,
+    pub user_uuid: uuid::Uuid,
+    pub dyno_id: i64,
+    pub long_usage: i64,
+    pub created_at: chrono::NaiveDateTime,
+}
+
 #[cfg_attr(debug_assert, derive(Debug))]
 #[derive(serde::Deserialize, serde::Serialize, Clone)]
 pub struct ApiResponse<T> {
