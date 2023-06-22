@@ -154,7 +154,7 @@ impl From<u8> for Cylinder {
     }
 }
 
-#[derive(Debug, Clone, derive_more::Display, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, derive_more::Display, serde::Deserialize, serde::Serialize)]
 pub enum MotorType {
     Electric(ElectricMotor),
     Engine(InfoMotor),
@@ -182,7 +182,7 @@ impl MotorType {
     }
 }
 
-#[derive(Debug, Clone, derive_more::Display, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, derive_more::Display, serde::Deserialize, serde::Serialize)]
 #[display(fmt = "[name: {name}]")]
 pub struct ElectricMotor {
     pub name: String,
@@ -196,7 +196,7 @@ impl Default for ElectricMotor {
     }
 }
 
-#[derive(Debug, Clone, derive_more::Display, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, derive_more::Display, serde::Deserialize, serde::Serialize)]
 #[display(fmt = "[{name} - {cc}|{cylinder}|{stroke}]")]
 #[serde(default)]
 pub struct InfoMotor {

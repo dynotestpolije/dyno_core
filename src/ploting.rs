@@ -1,38 +1,16 @@
-// use plotters::coord::Shift;
-// use plotters::prelude::*;
-// use std::path::{Path as StdPath, PathBuf};
-
-// use crate::{BufferData, DynoResult, Numeric};
-
-use std::path::{Path, PathBuf};
-
 use plotly::{
-    common::{Line, LineShape},
-    layout::{Axis, RangeSelector, RangeSlider, SelectorButton, SelectorStep, StepMode},
+    color::Rgba,
+    common::{AxisSide, Line, LineShape, Mode, Title},
+    layout::{Axis, RangeSlider},
     Layout, Plot,
 };
 
-use crate::{BufferData, DynoResult};
+use crate::{dynotests::DynoTest, Buffer, BufferData, Numeric};
 
-#[repr(usize)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum PlotOut {
-    #[default]
-    Show = 0,
-    Html,
-    Image,
-    Json,
-}
-
-// // 1600*1200
-
-#[derive(Default, Clone)]
+#[derive(Default, Clone, PartialEq)]
 pub struct DynoPlot {
     pub plot: Plot,
-    pub file: PathBuf,
     pub size: (u32, u32),
-
-    pub out: PlotOut,
 }
 
 impl std::ops::Deref for DynoPlot {
@@ -58,58 +36,107 @@ impl DynoPlot {
         self
     }
 
-    pub fn set_output_plot<P>(&mut self, out: PlotOut, file: Option<P>) -> &mut Self
-    where
-        P: AsRef<Path>,
-    {
-        if let Some(f) = file {
-            self.file = f.as_ref().to_path_buf();
-        }
-        self.out = out;
+    pub fn create_history_dyno(mut self, datas: impl AsRef<[DynoTest]>) -> Self {
+        let datas = datas.as_ref();
+        let y = datas
+            .iter()
+            .map(|d| (d.stop - d.start).num_seconds())
+            .collect::<Vec<_>>();
+        let x = datas.iter().map(|d| d.created_at).collect::<Vec<_>>();
+        let trace = plotly::Scatter::new(x, y)
+            .show_legend(true)
+            .mode(Mode::LinesMarkers)
+            .name("Long Usage (second)");
+
+        self.add_trace(trace);
+
+        let layout = Layout::new()
+            .x_axis(Axis::new().range_slider(RangeSlider::new().visible(true)))
+            .plot_background_color(Rgba::new(0, 0, 0, 0.5))
+            .paper_background_color(Rgba::new(0, 0, 0, 0.5))
+            .title(Title::new("History Usage Dyno"));
+        self.set_layout(layout);
         self
     }
-}
-impl DynoPlot {
-    pub fn create_all(mut self, data: &BufferData) -> DynoResult<()> {
-        self.add_trace(data.get_trace(0, &data.time_stamp, Line::new().shape(LineShape::Spline)));
-        (1..=3).for_each(|i| {
-            self.plot.add_trace(
-                data.get_trace(i, &data.time_stamp, Line::new().shape(LineShape::Spline))
-                    .y_axis(format!("y{}", i + 1)),
-            )
-        });
 
-        let layout = Layout::new().x_axis(
-            Axis::new()
-                .range_slider(RangeSlider::new().visible(true))
-                .range_selector(RangeSelector::new().buttons(vec![
-                        SelectorButton::new()
-                            .count(1)
-                            .label("30s")
-                            .step(SelectorStep::Second)
-                            .step_mode(StepMode::Backward),
-                        SelectorButton::new()
-                            .count(6)
-                            .label("1m")
-                            .step(SelectorStep::Minute)
-                            .step_mode(StepMode::Backward),
-                        SelectorButton::new()
-                            .count(1)
-                            .label("5m")
-                            .step(SelectorStep::Minute)
-                            .step_mode(StepMode::ToDate),
-                        SelectorButton::new()
-                            .count(1)
-                            .label("all")
-                            .step(SelectorStep::All)
-                            .step_mode(StepMode::Backward),
-                        SelectorButton::new().step(SelectorStep::All),
-                    ])),
+    pub fn create_dyno_plot(mut self, data: &BufferData) -> Self {
+        self.add_trace(
+            to_scatter("Speed (km/h)", &data.speed, &data.time_stamp)
+                .line(Line::new().shape(LineShape::Spline)),
         );
-        self.set_layout(layout);
-        Ok(())
+        self.add_trace(
+            to_scatter("RPM Roda (rpm)", &data.rpm_roda, &data.time_stamp)
+                .line(Line::new().shape(LineShape::Spline))
+                .y_axis("y2"),
+        );
+        self.add_trace(
+            to_scatter("RPM Engine (rpm)", &data.rpm_engine, &data.time_stamp)
+                .line(Line::new().shape(LineShape::Spline))
+                .y_axis("y3"),
+        );
+        self.add_trace(
+            to_scatter("Torque (Nm)", &data.torque, &data.time_stamp)
+                .line(Line::new().shape(LineShape::Spline))
+                .y_axis("y4"),
+        );
+        self.add_trace(
+            to_scatter("HorsePower (HP)", &data.horsepower, &data.time_stamp)
+                .line(Line::new().shape(LineShape::Spline))
+                .y_axis("y5"),
+        );
+        self.add_trace(
+            to_scatter("Temperature (C)", &data.temp, &data.time_stamp)
+                .line(Line::new().shape(LineShape::Spline))
+                .y_axis("y6"),
+        );
+
+        let layout = Layout::new()
+            .x_axis(Axis::new().range_slider(RangeSlider::new().visible(true)))
+            .y_axis(Axis::new().title(Title::new("Y Axis")))
+            .y_axis2(
+                Axis::new()
+                    .title(Title::new("Y Axis2"))
+                    .anchor("free")
+                    .overlaying("y")
+                    .side(AxisSide::Right),
+            )
+            .y_axis3(
+                Axis::new()
+                    .title(Title::new("RPM"))
+                    .anchor("x")
+                    .overlaying("y")
+                    .side(AxisSide::Right),
+            )
+            .plot_background_color(Rgba::new(0, 0, 0, 0.2))
+            .paper_background_color(Rgba::new(0, 0, 0, 0.4))
+            .title(Title::new("Dynotest Plot"));
+
+        self.plot.set_layout(layout);
+        self
+    }
+
+    #[cfg(feature = "use_wasm")]
+    pub async fn render_to_canvas(&self, canvas: impl AsRef<str>) {
+        plotly::bindings::new_plot(canvas.as_ref(), &self.plot).await;
     }
 }
+
+fn to_scatter<X: Numeric + serde::Serialize, Y: Numeric + serde::Serialize>(
+    name: impl AsRef<str>,
+    x: &Buffer<X>,
+    y: &Buffer<Y>,
+) -> Box<plotly::Scatter<X, Y>> {
+    plotly::Scatter::new(x.into_inner(), y.into_inner())
+        .mode(Mode::LinesMarkers)
+        .name(name.as_ref())
+        .show_legend(true)
+}
+
+// use plotters::coord::Shift;
+// use plotters::prelude::*;
+// use std::path::{Path as StdPath, PathBuf};
+
+// use crate::{BufferData, DynoResult, Numeric};
 
 // crate::set_builder!(&mut DynoPlotters {
 //     file: PathBuf,

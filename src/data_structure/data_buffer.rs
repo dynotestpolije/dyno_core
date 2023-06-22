@@ -197,6 +197,7 @@ impl BufferData {
         self.len == 0
     }
 
+    #[inline]
     pub fn process_data(&mut self) {
         self.speed.push(self.data.speed);
         self.rpm_roda.push(self.data.rpm_roda);

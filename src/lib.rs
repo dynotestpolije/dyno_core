@@ -108,7 +108,7 @@ macro_rules! ternary {
 
 #[macro_export]
 macro_rules! set_builder {
-    (&mut $strc:ident {$($name:ident: $nt:ty),* $(,)? }, $($def:expr)?) => {
+    (&mut $strc:ident {$($name:ident: $nt:ty),* $(,)? } $(,)? $($def:expr)?) => {
         paste::paste! {
             #[derive(Default)]
             pub struct [<$strc Builder>] {
