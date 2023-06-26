@@ -1,7 +1,6 @@
 use crate::{
     convertions::{length, weight},
-    data_structure::ExponentialFilter,
-    MotorType, Numeric, RotationPerMinute,
+    MotorType, Numeric,
 };
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq)]
@@ -32,8 +31,6 @@ pub struct DynoConfig {
 
     #[serde(default = "default_keliling_roller")]
     pub keliling_roller: length::Metres,
-
-    pub filter_rpm_engine: ExponentialFilter<RotationPerMinute>,
 }
 
 impl Default for DynoConfig {
@@ -48,7 +45,6 @@ impl Default for DynoConfig {
             gaya_beban: default_gaya_beban(),
             keliling_roller: default_keliling_roller(),
             motor_type: MotorType::default(),
-            filter_rpm_engine: ExponentialFilter::new(16),
         }
     }
 }

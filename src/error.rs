@@ -44,6 +44,7 @@ macro_rules! impl_err_kind {
         }
     };
 }
+
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display, Debug, Clone, Copy)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ErrKind {
@@ -95,7 +96,7 @@ pub enum ErrKind {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, derive_more::Display, Debug, Clone)]
-#[display(fmt = "ERROR: {kind} - {desc}")]
+#[display(fmt = "ERROR[{kind}]: {desc}")]
 pub struct DynoErr {
     pub desc: String,
     pub kind: ErrKind,
@@ -164,15 +165,14 @@ impl_from_to_string!(DynoErr => [
     "use_excel"     calamine::Error                                     as Excel,
     "use_excel"     rust_xlsxwriter::XlsxError                          as Excel,
     "use_async"     tokio::task::JoinError                              as AsyncTask,
-    "frontend"      reqwest::Error                                      as Service,
                     uuid::Error                                         as Uuid,
-                    Box<bincode::ErrorKind>                             as EncodingDecoding,
+                    Box<bincode::Error>                                 as EncodingDecoding,
                     toml::de::Error                                     as Deserialize,
                     toml::ser::Error                                    as Serialize,
                     serde_json::Error                                   as Deserialize,
-                    std::io::Error                                      as InputOutput,
                     core::num::ParseIntError                            as Parsing,
                     core::num::ParseFloatError                          as Parsing,
+                    std::io::Error                                      as InputOutput,
                     std::env::VarError                                  as InputOutput,
                     &'static str                                        as Any,
                     String                                              as Any,
@@ -202,8 +202,7 @@ impl actix_web::error::ResponseError for DynoErr {
     #[inline]
     fn error_response(&self) -> actix_web::HttpResponse {
         log::error!("Error Response: {}", &self);
-        actix_web::HttpResponse::build(self.status_code())
-            .json(crate::model::ApiResponse::error(self.clone()))
+        actix_web::HttpResponse::build(self.status_code()).body(self.desc.clone())
     }
 }
 

@@ -17,7 +17,7 @@ default     = ["dep:log", "use_chrono", "dep:uuid"]
 
 backend         = ["dep:actix-web", "use_crypto"]
 frontend        = ["dep:reqwest"]
-use_wasm        = ["uuid?/v7", "uuid?/js", "plotly?/wasm"]
+use_wasm        = ["uuid?/v7", "uuid?/js", "dep:web-sys", "plotly?/wasm"]
 use_excel       = ["dep:calamine", "dep:rust_xlsxwriter"]
 use_regex       = ["dep:regex"]
 use_chrono      = ["dep:chrono"]
@@ -49,15 +49,28 @@ regex               = { optional = true, version = "^1.8" } # For checking if we
 reqwest             = { optional = true, version = "^0.11", features = ["json", "multipart"] }
 tokio               = { optional = true, version = "^1.28", features = ["full"] }
 crossbeam-channel   = { optional = true, version = "^0.5" }
-plotly              = { optional = true, version = "^0.8" }
-calamine            = { optional = true, version = "^0.20", features = ["dates"] }
-rust_xlsxwriter     = { optional = true, version = "^0.40" }
+calamine            = { optional = true, version = "^0.21", features = ["dates"] }
+rust_xlsxwriter     = { optional = true, version = "^0.41" }
 
 base64              = { optional = true, version = "0.21" }
 argon2              = { optional = true, version = "^0.5" } 
 jsonwebtoken        = { optional = true, version = "^8" }
 rand_core           = { optional = true, version = "^0.6", features = ["std"] }
 sha2                = { optional = true, version = "^0.10" }
+plotly              = { optional = true, version = "^0.8" }
+
+[dependencies.web-sys]
+optional = true
+version = "^0.3"
+features = [
+    "HtmlCanvasElement",
+    "HtmlInputElement",
+    "Window",
+    "Document",
+    "Element",
+    "DomRect",
+    "SvgElement",
+]
 
 [dependencies.actix-web]
 version = "4"

@@ -6,27 +6,6 @@ pub mod temperature;
 pub mod torque;
 pub mod weight;
 
-#[repr(i32)]
-#[derive(Default)]
-pub enum Metrix {
-    Pico = -12,
-    Nano = -9,
-    Micro = -6,
-    Milli = -3,
-    Centi = -2,
-    #[default]
-    One = 0,
-    Kilo = 3,
-    Mega = 6,
-    Giga = 9,
-    Tera = 12,
-}
-impl Metrix {
-    pub fn from_num<N: crate::Numeric>(self, num: N) -> N {
-        num * N::from_float(crate::Float::powi(10.0, self as i32))
-    }
-}
-
 macro_rules! declare_std_convertion_type {
     ($types:ident[$fmt:literal]) => {
         #[derive(
@@ -51,8 +30,8 @@ macro_rules! declare_std_convertion_type {
                 stringify!($types)
             }
             #[inline]
-            pub fn value_fmt(self) -> String {
-                format!("{}", self.0)
+            pub fn name_type_fmt(self) -> String {
+                format!("{} {}", self.0, $fmt)
             }
             #[inline]
             pub fn value(self) -> $crate::Float {
@@ -63,10 +42,24 @@ macro_rules! declare_std_convertion_type {
                 &mut self.0
             }
         }
+
         impl std::fmt::Display for $types {
             #[inline(always)]
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{:.2}", self.0)
+            }
+        }
+
+        impl std::ops::Deref for $types {
+            type Target = $crate::Float;
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+
+        impl std::ops::DerefMut for $types {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.0
             }
         }
 

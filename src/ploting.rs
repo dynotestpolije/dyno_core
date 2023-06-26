@@ -1,16 +1,39 @@
+use chrono::{Local, NaiveDateTime, TimeZone};
 use plotly::{
-    color::Rgba,
-    common::{AxisSide, Line, LineShape, Mode, Title},
-    layout::{Axis, RangeSlider},
-    Layout, Plot,
+    common::{AxisSide, Font, Line, LineShape, Marker, Mode, TickFormatStop, Title},
+    layout::{Axis, Margin, RangeSelector, RangeSlider, SelectorButton, SelectorStep, StepMode},
+    Configuration, Layout, Plot,
 };
 
 use crate::{dynotests::DynoTest, Buffer, BufferData, Numeric};
 
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PlotColor {
+    pub(crate) fg: &'static str,
+    pub(crate) base: &'static str,
+    pub(crate) base100: &'static str,
+}
+impl PlotColor {
+    pub fn dark() -> Self {
+        Self {
+            fg: "#F1F1F1",
+            base: "#121212",
+            base100: "#202020",
+        }
+    }
+    pub fn light() -> Self {
+        Self {
+            fg: "#121212",
+            base: "#ffffff",
+            base100: "#f1f1f1",
+        }
+    }
+}
+
 #[derive(Default, Clone, PartialEq)]
 pub struct DynoPlot {
-    pub plot: Plot,
-    pub size: (u32, u32),
+    plot: Plot,
+    color: PlotColor,
 }
 
 impl std::ops::Deref for DynoPlot {
@@ -28,11 +51,25 @@ impl std::ops::DerefMut for DynoPlot {
 
 impl DynoPlot {
     pub fn new() -> Self {
-        Self::default()
+        let mut plot = Plot::new();
+        plot.set_configuration(
+            Configuration::new()
+                .editable(false)
+                .show_link(false)
+                .watermark(false)
+                .autosizable(true)
+                .display_logo(false)
+                .show_send_to_cloud(false)
+                .show_edit_in_chart_studio(false),
+        );
+        Self {
+            plot,
+            color: PlotColor::light(),
+        }
     }
 
-    pub fn set_size(&mut self, size: (u32, u32)) -> &mut Self {
-        self.size = size;
+    pub fn set_color(mut self, color: PlotColor) -> Self {
+        self.color = color;
         self
     }
 
@@ -40,76 +77,190 @@ impl DynoPlot {
         let datas = datas.as_ref();
         let y = datas
             .iter()
-            .map(|d| (d.stop - d.start).num_seconds())
+            .map(|d| Local.from_utc_datetime(&d.stop) - Local.from_utc_datetime(&d.start))
             .collect::<Vec<_>>();
-        let x = datas.iter().map(|d| d.created_at).collect::<Vec<_>>();
-        let trace = plotly::Scatter::new(x, y)
+        let y_s = y.iter().map(|d| d.num_seconds()).collect::<Vec<_>>();
+        let x = datas
+            .iter()
+            .map(|d| Local.from_utc_datetime(&d.start).format("%+").to_string())
+            .collect::<Vec<_>>();
+        let trace_s = plotly::Scatter::new(x, y_s)
             .show_legend(true)
-            .mode(Mode::LinesMarkers)
-            .name("Long Usage (second)");
+            .mode(Mode::Markers)
+            .marker(Marker::new().size(20))
+            .name("Long Usage");
 
-        self.add_trace(trace);
+        self.add_trace(trace_s);
 
         let layout = Layout::new()
-            .x_axis(Axis::new().range_slider(RangeSlider::new().visible(true)))
-            .plot_background_color(Rgba::new(0, 0, 0, 0.5))
-            .paper_background_color(Rgba::new(0, 0, 0, 0.5))
-            .title(Title::new("History Usage Dyno"));
+            .margin(Margin::new().top(40).bottom(20))
+            .plot_background_color(self.color.base)
+            .paper_background_color(self.color.base100)
+            .x_axis(
+                Axis::new()
+                    .range_slider(RangeSlider::new().visible(true))
+                    .range_selector(RangeSelector::new().buttons(vec![
+                        SelectorButton::new()
+                            .count(7)
+                            .label("1w")
+                            .step(SelectorStep::Day)
+                            .step_mode(StepMode::Backward),
+                        SelectorButton::new()
+                            .count(1)
+                            .label("1m")
+                            .step(SelectorStep::Month)
+                            .step_mode(StepMode::Backward),
+                        SelectorButton::new()
+                            .count(6)
+                            .label("6m")
+                            .step(SelectorStep::Month)
+                            .step_mode(StepMode::Backward),
+                        SelectorButton::new()
+                            .count(1)
+                            .label("1Y")
+                            .step(SelectorStep::Year)
+                            .step_mode(StepMode::Backward),
+                        SelectorButton::new().step(SelectorStep::All),
+                    ]))
+                    .tick_format_stops(vec![
+                        TickFormatStop::new()
+                            .dtick_range(vec![0, 1000])
+                            .value("%H:%M:%S.%L ms"),
+                        TickFormatStop::new()
+                            .dtick_range(vec![1000, 60000])
+                            .value("%H:%M:%S s"),
+                        TickFormatStop::new()
+                            .dtick_range(vec![60000, 3600000])
+                            .value("%H:%M m"),
+                        TickFormatStop::new()
+                            .dtick_range(vec![3600000, 86400000])
+                            .value("%H:%M h"),
+                        TickFormatStop::new()
+                            .dtick_range(vec![86400000, 604800000])
+                            .value("%e. %b d"),
+                        TickFormatStop::new()
+                            .dtick_range(vec!["M1", "M12"])
+                            .value("%b '%y M"),
+                    ]),
+            )
+            .y_axis(Axis::new().title(Title::new("Second")))
+            .auto_size(true);
+
         self.set_layout(layout);
         self
     }
 
     pub fn create_dyno_plot(mut self, data: &BufferData) -> Self {
+        let time_stamp: Vec<_> = data
+            .time_stamp
+            .iter()
+            .map(|x| {
+                Local
+                    .from_utc_datetime(
+                        &NaiveDateTime::from_timestamp_millis(*x).unwrap_or_default(),
+                    )
+                    .format("%+")
+                    .to_string()
+            })
+            .collect();
         self.add_trace(
-            to_scatter("Speed (km/h)", &data.speed, &data.time_stamp)
+            to_scatter("Speed (km/h)", &time_stamp, &data.speed)
                 .line(Line::new().shape(LineShape::Spline)),
         );
         self.add_trace(
-            to_scatter("RPM Roda (rpm)", &data.rpm_roda, &data.time_stamp)
+            to_scatter("RPM Roda", &time_stamp, &data.rpm_roda)
                 .line(Line::new().shape(LineShape::Spline))
                 .y_axis("y2"),
         );
         self.add_trace(
-            to_scatter("RPM Engine (rpm)", &data.rpm_engine, &data.time_stamp)
+            to_scatter("RPM Engine", &time_stamp, &data.rpm_engine)
+                .line(Line::new().shape(LineShape::Spline))
+                .y_axis("y2"),
+        );
+        self.add_trace(
+            to_scatter("Torque (Nm)", &time_stamp, &data.torque)
                 .line(Line::new().shape(LineShape::Spline))
                 .y_axis("y3"),
         );
         self.add_trace(
-            to_scatter("Torque (Nm)", &data.torque, &data.time_stamp)
+            to_scatter("HorsePower (HP)", &time_stamp, &data.horsepower)
                 .line(Line::new().shape(LineShape::Spline))
-                .y_axis("y4"),
+                .y_axis("y3"),
         );
         self.add_trace(
-            to_scatter("HorsePower (HP)", &data.horsepower, &data.time_stamp)
-                .line(Line::new().shape(LineShape::Spline))
-                .y_axis("y5"),
-        );
-        self.add_trace(
-            to_scatter("Temperature (C)", &data.temp, &data.time_stamp)
-                .line(Line::new().shape(LineShape::Spline))
-                .y_axis("y6"),
+            to_scatter("Temperature (C)", &time_stamp, &data.temp)
+                .line(Line::new().shape(LineShape::Spline)),
         );
 
         let layout = Layout::new()
-            .x_axis(Axis::new().range_slider(RangeSlider::new().visible(true)))
-            .y_axis(Axis::new().title(Title::new("Y Axis")))
-            .y_axis2(
+            .margin(Margin::new().top(40).bottom(20))
+            .font(Font::new().color(self.color.fg))
+            .plot_background_color(self.color.base)
+            .paper_background_color(self.color.base100)
+            .x_axis(
                 Axis::new()
-                    .title(Title::new("Y Axis2"))
-                    .anchor("free")
-                    .overlaying("y")
-                    .side(AxisSide::Right),
+                    .domain(&[0.05, 0.98])
+                    .range_selector(RangeSelector::new().buttons(vec![
+                        SelectorButton::new()
+                            .count(1)
+                            .label("1m")
+                            .step(SelectorStep::Minute)
+                            .step_mode(StepMode::Backward),
+                        SelectorButton::new()
+                            .count(6)
+                            .label("6m")
+                            .step(SelectorStep::Minute)
+                            .step_mode(StepMode::Backward),
+                        SelectorButton::new()
+                            .count(30)
+                            .label("30m")
+                            .step(SelectorStep::Minute)
+                            .step_mode(StepMode::Backward),
+                        SelectorButton::new()
+                            .count(1)
+                            .label("1h")
+                            .step(SelectorStep::Hour)
+                            .step_mode(StepMode::Backward),
+                        SelectorButton::new().step(SelectorStep::All),
+                    ]))
+                    .tick_format_stops(vec![
+                        TickFormatStop::new()
+                            .dtick_range(vec![0, 1000])
+                            .value("%H:%M:%S.%L ms"),
+                        TickFormatStop::new()
+                            .dtick_range(vec![1000, 60000])
+                            .value("%H:%M:%S s"),
+                        TickFormatStop::new()
+                            .dtick_range(vec![60000, 3600000])
+                            .value("%H:%M m"),
+                        TickFormatStop::new()
+                            .dtick_range(vec![3600000, 86400000])
+                            .value("%H:%M h"),
+                        TickFormatStop::new()
+                            .dtick_range(vec![86400000, 604800000])
+                            .value("%e. %b d"),
+                        TickFormatStop::new()
+                            .dtick_range(vec!["M1", "M12"])
+                            .value("%b '%y M"),
+                    ]),
             )
-            .y_axis3(
+            .y_axis(Axis::new().title(Title::new("Speed")))
+            .y_axis2(
                 Axis::new()
                     .title(Title::new("RPM"))
                     .anchor("x")
                     .overlaying("y")
                     .side(AxisSide::Right),
             )
-            .plot_background_color(Rgba::new(0, 0, 0, 0.2))
-            .paper_background_color(Rgba::new(0, 0, 0, 0.4))
-            .title(Title::new("Dynotest Plot"));
+            .y_axis3(
+                Axis::new()
+                    .title(Title::new("Torque and HP"))
+                    .anchor("free")
+                    .overlaying("y")
+                    .position(0.000)
+                    .side(AxisSide::Left),
+            )
+            .auto_size(true);
 
         self.plot.set_layout(layout);
         self
@@ -121,193 +272,15 @@ impl DynoPlot {
     }
 }
 
-fn to_scatter<X: Numeric + serde::Serialize, Y: Numeric + serde::Serialize>(
+fn to_scatter<Y: serde::Serialize + Numeric>(
     name: impl AsRef<str>,
-    x: &Buffer<X>,
+    x: &[String],
     y: &Buffer<Y>,
-) -> Box<plotly::Scatter<X, Y>> {
-    plotly::Scatter::new(x.into_inner(), y.into_inner())
+) -> Box<plotly::Scatter<String, Y>> {
+    plotly::Scatter::new(x.to_owned(), y.into_inner())
         .mode(Mode::LinesMarkers)
+        .line(Line::new().shape(LineShape::Spline))
         .name(name.as_ref())
+        .web_gl_mode(true)
         .show_legend(true)
 }
-
-// use plotters::coord::Shift;
-// use plotters::prelude::*;
-// use std::path::{Path as StdPath, PathBuf};
-
-// use crate::{BufferData, DynoResult, Numeric};
-
-// crate::set_builder!(&mut DynoPlotters {
-//     file: PathBuf,
-//     size: Option<(u32, u32)>,
-//     backend: Backends,
-// });
-
-// impl DynoPlotters {
-//     const DEFAULT_SIZE: (u32, u32) = (2048, 1600);
-//     pub fn new<P: AsRef<StdPath>>(file: P, backend: Backends) -> Self {
-//         Self {
-//             file: PathBuf::from(file.as_ref()),
-//             backend,
-//             ..Default::default()
-//         }
-//     }
-
-//     pub fn build() -> DynoPlottersBuilder {
-//         DynoPlottersBuilder::default()
-//     }
-// }
-
-// #[inline(always)]
-// pub fn format_unix_timestamp_chart(millis: &i64) -> String {
-//     format!(
-//         "{}",
-//         chrono::NaiveDateTime::from_timestamp_millis(*millis)
-//             .unwrap_or_default()
-//             .format("%H:%M:%S")
-//     )
-// }
-// #[inline(always)]
-// pub fn format_float<N: Numeric>(value: &N) -> String {
-//     format!("{:.2}", value.to_f64())
-// }
-
-// impl DynoPlotters {
-//     pub fn create(&self, data: &BufferData) -> DynoResult<()> {
-//         use Backends::*;
-//         let size = self.size.unwrap_or(Self::DEFAULT_SIZE);
-//         match self.backend {
-//             Svg => self.crate_impl(SVGBackend::new(&self.file, size), data),
-//             Png | Jpg => self.crate_impl(BitMapBackend::new(&self.file, size), data),
-//         }
-//     }
-
-//     pub fn crate_impl<DB>(&self, backend: DB, data: &BufferData) -> DynoResult<()>
-//     where
-//         DB: IntoDrawingArea,
-//     {
-//         let root = backend.into_drawing_area();
-//         root.fill(&WHITE)?;
-//         let root_area = root.titled("DynoTests Data Charts", ("sans-serif", 40))?;
-//         let (upper, lower) = root_area.split_vertically(50.percent());
-
-//         Self::create_top_chart(upper, data)?;
-//         Self::create_bottom_chart(lower, data)?;
-
-//         root.present()
-//             .map(|_| log::info!("DynoTests Chart has been saved to {}", self.file.display()))
-//             .map_err(|err| crate::DynoErr::plotters_error(
-//                 format!("Unable to write Chart to file, please make sure '{}' dir exists under current dir - [{err}]", self.file.display()))
-//             )
-//     }
-
-//     fn create_bottom_chart<DB>(root: DrawingArea<DB, Shift>, data: &BufferData) -> DynoResult<()>
-//     where
-//         DB: DrawingBackend,
-//     {
-//         let x_min = data.rpm.min_value().to_u64() / 1000;
-//         let x_max = data.rpm.max_value().to_u64() / 1000;
-//         let y_min = data
-//             .torque
-//             .min_value()
-//             .to_f64()
-//             .min(data.horsepower.min_value().to_f64());
-//         let y_max = data
-//             .torque
-//             .max_value()
-//             .to_f64()
-//             .max(data.horsepower.max_value().to_f64());
-
-//         let mut cc = ChartBuilder::<DB>::on(&root)
-//             .margin(8.percent())
-//             .x_label_area_size(10.percent_height())
-//             .y_label_area_size(14.percent_height())
-//             .caption(
-//                 "Torque And Power / RPM",
-//                 ("sans-serif", (5).percent_height()),
-//             )
-//             .build_cartesian_2d(x_min..x_max, (y_min - y_max / 6.)..(y_max + y_max / 6.))?;
-
-//         cc.configure_mesh()
-//             .x_labels(15)
-//             .y_labels(15)
-//             .max_light_lines(2)
-//             .x_desc("Rpm Engine (RPM x 1000)")
-//             .y_desc("Torsi (Nm) And Power (HP)")
-//             .x_label_formatter(&ToString::to_string)
-//             .y_label_formatter(&format_float)
-//             .draw()?;
-
-//         let iter_torque = data.torque.iter().map(|x| x.to_f64());
-//         let iter_hp = data.horsepower.iter().map(|x| x.to_f64());
-//         let mut series = data
-//             .rpm
-//             .iter()
-//             .map(|x| x.to_u64() / 1000)
-//             .zip(iter_torque.zip(iter_hp))
-//             .map(|(a, (b, c))| (a, [b, c]))
-//             .collect::<Vec<_>>();
-//         series.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
-//         series.dedup_by(|(a, _), (b, _)| *a == *b);
-
-//         for (i, &vidx) in [2usize, 3usize].iter().enumerate() {
-//             let color = Palette99::pick(vidx);
-//             cc.draw_series(LineSeries::new(
-//                 series.iter().map(|(rpm, v)| (*rpm, v[i])),
-//                 color.stroke_width(3),
-//             ))?
-//             .label(BufferData::BUFFER_NAME[vidx])
-//             .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color.filled()));
-//         }
-
-//         cc.configure_series_labels()
-//             .border_style(BLACK)
-//             .draw()
-//             .map_err(From::from)
-//     }
-
-//     fn create_top_chart<DB>(root: DrawingArea<DB, Shift>, data: &BufferData) -> DynoResult<()>
-//     where
-//         DB: DrawingBackend,
-//     {
-//         let y_min = data.min();
-//         let y_max = data.max();
-//         let x_max = data.len() as i64;
-//         let mut cc = ChartBuilder::<DB>::on(&root)
-//             .margin(8.percent())
-//             .x_label_area_size(10.percent_height())
-//             .y_label_area_size(14.percent_height())
-//             .caption("DynoTests Data", ("sans-serif", (5).percent_height()))
-//             .build_cartesian_2d(0..x_max, (y_min - y_max / 4.)..(y_max + y_max / 4.))?;
-
-//         cc.configure_mesh()
-//             .x_labels(15)
-//             .y_labels(15)
-//             // .disable_mesh()
-//             .max_light_lines(2)
-//             .x_desc("TimeStamp")
-//             .y_desc("Value")
-//             .x_label_formatter(&|i| {
-//                 format_unix_timestamp_chart(&data.time_stamp[(*i % x_max) as usize])
-//             })
-//             .y_label_formatter(&format_float)
-//             .draw()?;
-
-//         for idx in 0..=3 {
-//             let color = Palette99::pick(idx).mix(0.9);
-//             cc.draw_series(LineSeries::new(
-//                 (0..x_max).zip(data.get_iter(idx)),
-//                 color.stroke_width(3),
-//             ))?
-//             .label(BufferData::BUFFER_NAME[idx])
-//             .legend(move |(x, y)| {
-//                 PathElement::new(vec![(x, y), (x + 20, y)], color.filled().stroke_width(3))
-//             });
-//         }
-//         cc.configure_series_labels()
-//             .border_style(BLACK)
-//             .draw()
-//             .map_err(From::from)
-//     }
-// }

@@ -1,4 +1,33 @@
-use crate::{ternary, Numeric};
+use crate::{ternary, HorsePower, NewtonMeter, Numeric, RotationPerMinute};
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct DataFilter {
+    pub torque: ExponentialFilter<NewtonMeter>,
+    pub horsepower: ExponentialFilter<HorsePower>,
+    pub rpm_roda: ExponentialFilter<RotationPerMinute>,
+    pub rpm_engine: ExponentialFilter<RotationPerMinute>,
+}
+impl Default for DataFilter {
+    fn default() -> Self {
+        Self {
+            torque: ExponentialFilter::new(2),
+            horsepower: ExponentialFilter::new(2),
+            rpm_roda: ExponentialFilter::new(100),
+            rpm_engine: ExponentialFilter::new(100),
+        }
+    }
+}
+
+impl DataFilter {
+    #[allow(dead_code)]
+    #[inline]
+    pub fn reset(&mut self) {
+        self.torque.reset();
+        self.horsepower.reset();
+        self.rpm_roda.reset();
+        self.rpm_engine.reset();
+    }
+}
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ExponentialFilter<T: Numeric> {

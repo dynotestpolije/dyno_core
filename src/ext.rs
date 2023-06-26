@@ -152,12 +152,12 @@ pub fn any_from_u8_slice<T: Sized>(b: &[u8]) -> T {
 pub trait BinSerializeDeserialize: serde::Serialize + serde::de::DeserializeOwned {
     #[inline(always)]
     fn serialize_bin(&self) -> crate::DynoResult<Vec<u8>> {
-        bincode::serialize(self).map_err(From::from)
+        bincode::serialize(self).map_err(crate::DynoErr::serialize_error)
     }
 
     #[inline(always)]
     fn deserialize_bin(bin: &[u8]) -> crate::DynoResult<Self> {
-        bincode::deserialize(bin).map_err(From::from)
+        bincode::deserialize(bin).map_err(crate::DynoErr::deserialize_error)
     }
 
     #[deprecated(note = "use the `CompresedSaver::compress_to_file()` instead")]
@@ -169,7 +169,7 @@ pub trait BinSerializeDeserialize: serde::Serialize + serde::de::DeserializeOwne
     #[deprecated(note = "use the `CompresedSaver::decompress_from_file()` instead")]
     fn deserialize_from_file<P: AsRef<std::path::Path>>(path: P) -> crate::DynoResult<Self> {
         let data = std::fs::read(path)?;
-        bincode::deserialize(&data).map_err(From::from)
+        bincode::deserialize(&data).map_err(crate::DynoErr::deserialize_error)
     }
     // add code here
 }

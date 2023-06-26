@@ -3,6 +3,8 @@ use crate::{
 };
 use chrono::{NaiveDateTime, Utc};
 
+use super::filter::DataFilter;
+
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Data {
     pub speed: KilometresPerHour,
@@ -84,7 +86,7 @@ impl Data {
         self.rpm_roda = rpm_roda;
         self.percepatan_sudut = percepatan_sudut;
         self.percepatan_roller = percepatan_roller;
-        self.rpm_engine = config.filter_rpm_engine.next(rpm_engine);
+        self.rpm_engine = rpm_engine;
     }
 
     pub fn time_duration_formatted(&self, start: chrono::NaiveTime) -> String {
@@ -147,6 +149,7 @@ pub struct BufferData {
     pub temp: Buffer<Celcius>,
     pub time_stamp: Buffer<i64>,
 
+    pub filter: DataFilter,
     pub data: Data,
     pub len: usize,
 }
@@ -189,6 +192,8 @@ impl BufferData {
         self.horsepower.clear();
         self.temp.clear();
         self.time_stamp.clear();
+        self.data = Default::default();
+        self.filter.reset();
         self.len = 0;
     }
 
@@ -200,10 +205,13 @@ impl BufferData {
     #[inline]
     pub fn process_data(&mut self) {
         self.speed.push(self.data.speed);
-        self.rpm_roda.push(self.data.rpm_roda);
-        self.rpm_engine.push(self.data.rpm_engine);
-        self.torque.push(self.data.torque);
-        self.horsepower.push(self.data.horsepower);
+        self.rpm_roda
+            .push(self.filter.rpm_roda.next(self.data.rpm_roda));
+        self.rpm_engine
+            .push(self.filter.rpm_engine.next(self.data.rpm_engine));
+        self.torque.push(self.filter.torque.next(self.data.torque));
+        self.horsepower
+            .push(self.filter.horsepower.next(self.data.horsepower));
         self.temp.push(self.data.temp);
         self.time_stamp
             .push(self.data.time_stamp.timestamp_millis() as _);
@@ -258,42 +266,6 @@ impl BufferData {
         .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Greater))
         .copied()
         .unwrap_or_default()
-    }
-}
-
-#[cfg(feature = "use_plot")]
-impl BufferData {
-    pub fn get_trace<X>(
-        &self,
-        idx: usize,
-        x_axis: &Buffer<X>,
-        line: plotly::common::Line,
-    ) -> Box<plotly::Scatter<X, Float>>
-    where
-        X: serde::Serialize + Clone + Copy + Sized,
-    {
-        let scatter_impl = |b: Vec<Float>| {
-            plotly::Scatter::new(x_axis.into_inner(), b)
-                .mode(plotly::common::Mode::LinesMarkers)
-                .name(Self::BUFFER_NAME[idx])
-                .show_legend(true)
-                .line(line)
-        };
-        match idx {
-            0 => scatter_impl(self.speed.iter().map(|x| x.to_float()).collect()),
-            1 => scatter_impl(self.rpm_roda.iter().map(|x| x.to_float() * 0.001).collect()),
-            2 => scatter_impl(
-                self.rpm_engine
-                    .iter()
-                    .map(|x| x.to_float() * 0.001)
-                    .collect(),
-            ),
-            3 => scatter_impl(self.torque.iter().map(|x| x.to_float()).collect()),
-            4 => scatter_impl(self.horsepower.iter().map(|x| x.to_float()).collect()),
-            5 => scatter_impl(self.temp.iter().map(|x| x.to_float()).collect()),
-            6 => scatter_impl(self.time_stamp.iter().map(|x| x.to_float()).collect()),
-            _ => unreachable!("index is overflow {idx}"),
-        }
     }
 }
 
