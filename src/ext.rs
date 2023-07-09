@@ -152,12 +152,22 @@ pub fn any_from_u8_slice<T: Sized>(b: &[u8]) -> T {
 pub trait BinSerializeDeserialize: serde::Serialize + serde::de::DeserializeOwned {
     #[inline(always)]
     fn serialize_bin(&self) -> crate::DynoResult<Vec<u8>> {
-        bincode::serialize(self).map_err(From::from)
+        use bincode::Options;
+        bincode::DefaultOptions::new()
+            .with_fixint_encoding()
+            .allow_trailing_bytes()
+            .serialize(self)
+            .map_err(crate::DynoErr::serialize_error)
     }
 
     #[inline(always)]
     fn deserialize_bin(bin: &[u8]) -> crate::DynoResult<Self> {
-        bincode::deserialize(bin).map_err(From::from)
+        use bincode::Options;
+        bincode::DefaultOptions::new()
+            .with_fixint_encoding()
+            .allow_trailing_bytes()
+            .deserialize(bin)
+            .map_err(crate::DynoErr::deserialize_error)
     }
 
     #[deprecated(note = "use the `CompresedSaver::compress_to_file()` instead")]
@@ -169,7 +179,7 @@ pub trait BinSerializeDeserialize: serde::Serialize + serde::de::DeserializeOwne
     #[deprecated(note = "use the `CompresedSaver::decompress_from_file()` instead")]
     fn deserialize_from_file<P: AsRef<std::path::Path>>(path: P) -> crate::DynoResult<Self> {
         let data = std::fs::read(path)?;
-        bincode::deserialize(&data).map_err(From::from)
+        bincode::deserialize(&data).map_err(crate::DynoErr::deserialize_error)
     }
     // add code here
 }
@@ -186,9 +196,7 @@ pub trait CompresedSaver: BinSerializeDeserialize {
     fn decompress(data: impl AsRef<[u8]>) -> crate::DynoResult<Self> {
         miniz_oxide::inflate::decompress_to_vec(data.as_ref())
             .map_err(crate::DynoErr::encoding_decoding_error)
-            .and_then(|data| {
-                bincode::deserialize(&data).map_err(crate::DynoErr::encoding_decoding_error)
-            })
+            .and_then(|data| Self::deserialize_bin(&data))
     }
     fn compress_to_path<P: AsRef<std::path::Path>>(&self, path: P) -> crate::DynoResult<()> {
         std::fs::write(path, self.compress()?).map_err(From::from)
@@ -276,5 +284,11 @@ pub trait ExcelSaver: Sized {
     fn save_excel_from_path<P: AsRef<std::path::Path>>(&self, path: P) -> crate::DynoResult<()> {
         let mut file = std::io::BufWriter::new(std::fs::File::create(path)?);
         self.save_excel_from_writer(&mut file).map_err(From::from)
+    }
+
+    fn save_excel_into_bytes(&self) -> crate::DynoResult<Vec<u8>> {
+        let mut writer: Vec<u8> = vec![];
+        self.save_excel_from_writer(&mut writer)?;
+        Ok(writer)
     }
 }

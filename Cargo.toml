@@ -15,14 +15,15 @@ publish = false
 [features]
 default     = ["dep:log", "use_chrono", "dep:uuid"]
 
-backend         = ["dep:actix-web", "use_crypto"]
-frontend        = ["dep:reqwest"]
-use_wasm        = ["uuid?/v7", "uuid?/js", "plotly?/wasm"]
+backend         = ["use_crypto", "dep:actix-web"]
+frontend        = []
+use_wasm        = ["uuid?/v7", "uuid?/js", "dep:web-sys", "plotly?/wasm"]
 use_excel       = ["dep:calamine", "dep:rust_xlsxwriter"]
 use_regex       = ["dep:regex"]
 use_chrono      = ["dep:chrono"]
 use_plot        = ["dep:plotly"]
-use_async       = ["use_tokio", "dep:crossbeam-channel"]
+use_async       = ["use_tokio", "use_crossbeam"]
+use_crossbeam   = ["dep:crossbeam-channel"]
 use_tokio       = ["dep:tokio"]
 use_crypto      = ["password_hashing", "jwt_encode_decode", "checksum"]
 
@@ -46,22 +47,31 @@ bincode             = { version = "^1.3" }
 chrono              = { optional = true, version = "^0.4", features = ["serde"]}
 log                 = { optional = true, version = "^0.4" }
 regex               = { optional = true, version = "^1.8" } # For checking if we need to skip auth
-reqwest             = { optional = true, version = "^0.11", features = ["json", "multipart"] }
 tokio               = { optional = true, version = "^1.28", features = ["full"] }
 crossbeam-channel   = { optional = true, version = "^0.5" }
-plotly              = { optional = true, version = "^0.8" }
-calamine            = { optional = true, version = "^0.20", features = ["dates"] }
-rust_xlsxwriter     = { optional = true, version = "^0.40" }
+calamine            = { optional = true, version = "^0.21", features = ["dates"] }
+rust_xlsxwriter     = { optional = true, version = "^0.41" }
 
 base64              = { optional = true, version = "0.21" }
 argon2              = { optional = true, version = "^0.5" } 
 jsonwebtoken        = { optional = true, version = "^8" }
 rand_core           = { optional = true, version = "^0.6", features = ["std"] }
 sha2                = { optional = true, version = "^0.10" }
+plotly              = { optional = true, version = "^0.8" }
+actix-web           = { optional = true, version = "4.3.1", default-features = false }
 
-[dependencies.actix-web]
-version = "4"
+[dependencies.web-sys]
 optional = true
+version = "^0.3"
+features = [
+    "HtmlCanvasElement",
+    "HtmlInputElement",
+    "Window",
+    "Document",
+    "Element",
+    "DomRect",
+    "SvgElement",
+]
 
 [dependencies.uuid]
 version = "^1.3"

@@ -1,4 +1,4 @@
-#[repr(i16)]
+#[repr(u8)]
 #[derive(
     serde::Deserialize,
     serde::Serialize,
@@ -45,7 +45,7 @@ impl From<u8> for Stroke {
     }
 }
 
-#[repr(i8)]
+#[repr(u8)]
 #[derive(
     serde::Deserialize,
     serde::Serialize,
@@ -62,11 +62,11 @@ pub enum Transmition {
     Unknown,
     #[default]
     Automatic,
-    Manual(u8),
+    Manual,
 }
 impl Transmition {
     pub fn into_iter() -> impl Iterator<Item = Self> {
-        [Self::Unknown, Self::Automatic, Self::Manual(4)].into_iter()
+        [Self::Unknown, Self::Automatic, Self::Manual].into_iter()
     }
 }
 
@@ -75,7 +75,7 @@ impl std::fmt::Display for Transmition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
             Transmition::Unknown => write!(f, "Unknown Transmition"),
-            Transmition::Manual(tr) => write!(f, "Manual Transmition: {tr}"),
+            Transmition::Manual => write!(f, "Manual Transmition"),
             Transmition::Automatic => write!(f, "Automatic Transmition"),
         }
     }
@@ -85,13 +85,13 @@ impl From<u8> for Transmition {
     fn from(val: u8) -> Self {
         match val {
             0 => Transmition::Automatic,
-            1..=8 => Transmition::Manual(val),
+            1..=8 => Transmition::Manual,
             _ => Transmition::Unknown,
         }
     }
 }
 
-#[repr(i16)]
+#[repr(u8)]
 #[derive(
     serde::Deserialize,
     serde::Serialize,
@@ -154,44 +154,42 @@ impl From<u8> for Cylinder {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, derive_more::Display, serde::Deserialize, serde::Serialize)]
+#[repr(u8)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    derive_more::Display,
+    serde::Deserialize,
+    serde::Serialize,
+)]
 pub enum MotorType {
-    Electric(ElectricMotor),
-    Engine(InfoMotor),
-}
-
-impl Default for MotorType {
-    fn default() -> Self {
-        Self::Engine(InfoMotor::default())
-    }
+    #[default]
+    Engine,
+    Electric,
 }
 
 impl MotorType {
-    pub fn name(&self) -> String {
-        match self {
-            MotorType::Electric(i) => i.name.clone(),
-            MotorType::Engine(i) => i.name.clone(),
-        }
-    }
     pub fn is_electric(&self) -> bool {
-        matches!(self, Self::Electric(_))
+        matches!(self, Self::Electric)
     }
 
     pub fn is_engine(&self) -> bool {
-        matches!(self, Self::Engine(_))
+        matches!(self, Self::Engine)
     }
 }
 
-#[derive(Debug, Clone, PartialEq, derive_more::Display, serde::Deserialize, serde::Serialize)]
-#[display(fmt = "[name: {name}]")]
-pub struct ElectricMotor {
-    pub name: String,
-}
-
-impl Default for ElectricMotor {
-    fn default() -> Self {
-        Self {
-            name: "Electric Motor Name".to_owned(),
+impl From<u8> for MotorType {
+    fn from(val: u8) -> Self {
+        match val {
+            0 => Self::Engine,
+            1 => Self::Electric,
+            _ => Self::Engine,
         }
     }
 }
@@ -199,7 +197,7 @@ impl Default for ElectricMotor {
 #[derive(Debug, Clone, PartialEq, derive_more::Display, serde::Deserialize, serde::Serialize)]
 #[display(fmt = "[{name} - {cc}|{cylinder}|{stroke}]")]
 #[serde(default)]
-pub struct InfoMotor {
+pub struct MotorInfo {
     pub name: String,
     pub cc: u32,
     pub cylinder: Cylinder,
@@ -207,19 +205,19 @@ pub struct InfoMotor {
     pub transmition: Transmition,
 }
 
-impl Default for InfoMotor {
+impl Default for MotorInfo {
     fn default() -> Self {
         Self {
             name: "Default Info".to_owned(),
-            cc: 4,
+            cc: 125,
             cylinder: Cylinder::Single,
             stroke: Stroke::Four,
-            transmition: Transmition::Manual(4),
+            transmition: Transmition::Manual,
         }
     }
 }
 
-impl InfoMotor {
+impl MotorInfo {
     pub fn new() -> Self {
         Self::default()
     }
