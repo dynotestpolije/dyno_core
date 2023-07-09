@@ -1,11 +1,9 @@
-use crate::{
-    convertions::prelude::*, Buffer, CsvSaver, Float, InfoMotor, MotorType, Numeric, Stroke,
-};
+use crate::{convertions::prelude::*, Buffer, CsvSaver, Float, MotorType, Numeric, Stroke};
 use chrono::{NaiveDateTime, Utc};
 
 use super::filter::DataFilter;
 
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, Clone, Copy, serde::Deserialize, serde::Serialize)]
 pub struct Data {
     pub speed: KilometresPerHour,
     pub torque: NewtonMeter,
@@ -24,6 +22,17 @@ impl Data {
         Self {
             ..Default::default()
         }
+    }
+    pub fn from_self(&mut self, other: Self) {
+        let tmp = self.odo;
+        *self = other;
+        self.odo += tmp;
+    }
+    pub fn filter(&mut self, filter: &mut DataFilter) {
+        self.rpm_roda = filter.rpm_roda.next(self.rpm_roda);
+        self.rpm_engine = filter.rpm_engine.next(self.rpm_engine);
+        self.torque = filter.torque.next(self.torque);
+        self.horsepower = filter.horsepower.next(self.horsepower);
     }
 
     pub fn from_serial(
@@ -57,16 +66,14 @@ impl Data {
 
         let rpm_roda = RotationPerMinute::from_rot(putaran, delta_ms).if_not_normal(self.rpm_roda);
         let rpm_engine = match &config.motor_type {
-            MotorType::Engine(InfoMotor {
-                cylinder, stroke, ..
-            }) => match stroke {
+            MotorType::Engine => match config.motor_info.stroke {
                 Stroke::Four => RotationPerMinute::from_rot(
-                    ((pulse_rpm * 2) / (*cylinder as u32)) as Float,
+                    ((pulse_rpm * 2) / (config.motor_info.cylinder as u32)) as Float,
                     delta_ms,
                 ),
                 _ => RotationPerMinute::from_rot(pulse_rpm as Float, delta_ms),
             },
-            MotorType::Electric(_) => RotationPerMinute::from_rot(pulse_rpm as Float, delta_ms),
+            MotorType::Electric => RotationPerMinute::from_rot(pulse_rpm as Float, delta_ms),
         }
         .if_not_normal(self.rpm_engine);
 
@@ -149,9 +156,12 @@ pub struct BufferData {
     pub temp: Buffer<Celcius>,
     pub time_stamp: Buffer<i64>,
 
-    pub filter: DataFilter,
     pub data: Data,
     pub len: usize,
+
+    #[serde(skip)]
+    #[serde(default)]
+    pub total_time: u64,
 }
 
 #[repr(usize)]
@@ -193,7 +203,6 @@ impl BufferData {
         self.temp.clear();
         self.time_stamp.clear();
         self.data = Default::default();
-        self.filter.reset();
         self.len = 0;
     }
 
@@ -205,13 +214,10 @@ impl BufferData {
     #[inline]
     pub fn process_data(&mut self) {
         self.speed.push(self.data.speed);
-        self.rpm_roda
-            .push(self.filter.rpm_roda.next(self.data.rpm_roda));
-        self.rpm_engine
-            .push(self.filter.rpm_engine.next(self.data.rpm_engine));
-        self.torque.push(self.filter.torque.next(self.data.torque));
-        self.horsepower
-            .push(self.filter.horsepower.next(self.data.horsepower));
+        self.rpm_roda.push(self.data.rpm_roda);
+        self.rpm_engine.push(self.data.rpm_engine);
+        self.torque.push(self.data.torque);
+        self.horsepower.push(self.data.horsepower);
         self.temp.push(self.data.temp);
         self.time_stamp
             .push(self.data.time_stamp.timestamp_millis() as _);
@@ -224,8 +230,31 @@ impl BufferData {
         config: &'_ mut crate::config::DynoConfig,
         serial_data: crate::SerialData,
     ) {
+        self.total_time += serial_data.period as u64;
         self.data.from_serial(config, serial_data);
+        self.data.filter(&mut config.filter);
         self.process_data();
+    }
+
+    pub fn push_from_data(&mut self, config: &'_ mut crate::config::DynoConfig, data: Data) {
+        self.data.from_self(data);
+        self.data.filter(&mut config.filter);
+        self.process_data();
+    }
+
+    pub fn extend_data(&mut self, data: impl AsRef<[Data]>) {
+        data.as_ref().iter().copied().for_each(|d| {
+            self.data.from_self(d);
+            self.process_data();
+        })
+    }
+
+    #[inline]
+    pub fn time_fmt(&self) -> String {
+        let seconds = (self.total_time / 1000) % 60;
+        let minutes = (self.total_time / (1000 * 60)) % 60;
+        let hours = (self.total_time / (1000 * 60 * 60)) % 24;
+        format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
     }
 
     #[inline]

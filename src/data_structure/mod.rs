@@ -1,6 +1,6 @@
 pub mod buffer;
 pub mod data_buffer;
-mod filter;
+pub mod filter;
 pub mod infomotor;
 pub use filter::ExponentialFilter;
 
@@ -36,7 +36,6 @@ impl SerialData {
     pub const SIZE: usize = ::core::mem::size_of::<SerialData>();
     pub const DELIM: u8 = b'\n';
 
-    #[cfg(not(feature = "use_bincode"))]
     #[inline(always)]
     // konversi bytes (array of byte) secara menyamakan memory layout
     // memvalidasi apakah ukuran bytes sama dengan ukuran  data struct
@@ -45,11 +44,5 @@ impl SerialData {
             return None;
         }
         Some(unsafe { std::ptr::read::<Self>(bytes.as_ptr() as *const _) })
-    }
-
-    #[cfg(feature = "use_bincode")]
-    #[inline(always)]
-    pub fn from_bytes(bytes: &'_ [u8]) -> Option<Self> {
-        bincode::deserialize(bytes).ok()
     }
 }

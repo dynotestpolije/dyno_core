@@ -52,17 +52,11 @@ pub use log;
 #[cfg(feature = "use_regex")]
 pub use regex;
 
-// #[cfg(feature = "backend")]
-// pub use actix_web;
-
-#[cfg(feature = "use_async")]
+#[cfg(feature = "use_tokio")]
 pub use tokio;
 
-#[cfg(feature = "use_async")]
+#[cfg(feature = "use_crossbeam")]
 pub use crossbeam_channel;
-
-#[cfg(feature = "frontend")]
-pub use reqwest;
 
 pub use lazy_static;
 

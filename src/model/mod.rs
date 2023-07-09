@@ -50,7 +50,7 @@ impl TokenClaims {
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
 pub struct ActiveResponse {
     pub user: Option<users::UserResponse>,
     pub dyno: Option<DynoConfig>,
@@ -70,10 +70,8 @@ pub enum ResponseStatus {
 
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct HistoryResponse {
+    pub id: i64,
     pub user_id: i64,
-    pub user_uuid: uuid::Uuid,
-    pub dyno_id: i64,
-    pub long_usage: i64,
     pub created_at: chrono::NaiveDateTime,
 }
 

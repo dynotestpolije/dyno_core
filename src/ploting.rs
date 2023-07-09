@@ -1,6 +1,6 @@
 use chrono::{Local, NaiveDateTime, TimeZone};
 use plotly::{
-    common::{AxisSide, Font, Line, LineShape, Marker, Mode, TickFormatStop, Title},
+    common::{AxisSide, Font, Line, LineShape, Marker, Mode, Title},
     layout::{Axis, Margin, RangeSelector, RangeSlider, SelectorButton, SelectorStep, StepMode},
     Configuration, Layout, Plot,
 };
@@ -14,14 +14,14 @@ pub struct PlotColor {
     pub(crate) base100: &'static str,
 }
 impl PlotColor {
-    pub fn dark() -> Self {
+    pub const fn dark() -> Self {
         Self {
             fg: "#F1F1F1",
             base: "#121212",
             base100: "#202020",
         }
     }
-    pub fn light() -> Self {
+    pub const fn light() -> Self {
         Self {
             fg: "#121212",
             base: "#ffffff",
@@ -77,14 +77,13 @@ impl DynoPlot {
         let datas = datas.as_ref();
         let y = datas
             .iter()
-            .map(|d| Local.from_utc_datetime(&d.stop) - Local.from_utc_datetime(&d.start))
+            .map(|d| (d.stop - d.start).num_seconds())
             .collect::<Vec<_>>();
-        let y_s = y.iter().map(|d| d.num_seconds()).collect::<Vec<_>>();
         let x = datas
             .iter()
-            .map(|d| Local.from_utc_datetime(&d.start).format("%+").to_string())
+            .map(|d| Local.from_utc_datetime(&d.created_at))
             .collect::<Vec<_>>();
-        let trace_s = plotly::Scatter::new(x, y_s)
+        let trace_s = plotly::Scatter::new(x, y)
             .show_legend(true)
             .mode(Mode::Markers)
             .marker(Marker::new().size(20))
@@ -96,53 +95,7 @@ impl DynoPlot {
             .margin(Margin::new().top(40).bottom(20))
             .plot_background_color(self.color.base)
             .paper_background_color(self.color.base100)
-            .x_axis(
-                Axis::new()
-                    .range_slider(RangeSlider::new().visible(true))
-                    .range_selector(RangeSelector::new().buttons(vec![
-                        SelectorButton::new()
-                            .count(7)
-                            .label("1w")
-                            .step(SelectorStep::Day)
-                            .step_mode(StepMode::Backward),
-                        SelectorButton::new()
-                            .count(1)
-                            .label("1m")
-                            .step(SelectorStep::Month)
-                            .step_mode(StepMode::Backward),
-                        SelectorButton::new()
-                            .count(6)
-                            .label("6m")
-                            .step(SelectorStep::Month)
-                            .step_mode(StepMode::Backward),
-                        SelectorButton::new()
-                            .count(1)
-                            .label("1Y")
-                            .step(SelectorStep::Year)
-                            .step_mode(StepMode::Backward),
-                        SelectorButton::new().step(SelectorStep::All),
-                    ]))
-                    .tick_format_stops(vec![
-                        TickFormatStop::new()
-                            .dtick_range(vec![0, 1000])
-                            .value("%H:%M:%S.%L ms"),
-                        TickFormatStop::new()
-                            .dtick_range(vec![1000, 60000])
-                            .value("%H:%M:%S s"),
-                        TickFormatStop::new()
-                            .dtick_range(vec![60000, 3600000])
-                            .value("%H:%M m"),
-                        TickFormatStop::new()
-                            .dtick_range(vec![3600000, 86400000])
-                            .value("%H:%M h"),
-                        TickFormatStop::new()
-                            .dtick_range(vec![86400000, 604800000])
-                            .value("%e. %b d"),
-                        TickFormatStop::new()
-                            .dtick_range(vec!["M1", "M12"])
-                            .value("%b '%y M"),
-                    ]),
-            )
+            .x_axis(Axis::new().range_slider(RangeSlider::new().visible(true)))
             .y_axis(Axis::new().title(Title::new("Second")))
             .auto_size(true);
 
@@ -192,15 +145,14 @@ impl DynoPlot {
                 .line(Line::new().shape(LineShape::Spline)),
         );
 
-        let layout = Layout::new()
-            .margin(Margin::new().top(40).bottom(20))
-            .font(Font::new().color(self.color.fg))
-            .plot_background_color(self.color.base)
-            .paper_background_color(self.color.base100)
-            .x_axis(
-                Axis::new()
-                    .domain(&[0.05, 0.98])
-                    .range_selector(RangeSelector::new().buttons(vec![
+        let layout =
+            Layout::new()
+                .margin(Margin::new().top(40).bottom(20))
+                .font(Font::new().color(self.color.fg))
+                .plot_background_color(self.color.base)
+                .paper_background_color(self.color.base100)
+                .x_axis(Axis::new().domain(&[0.05, 0.98]).range_selector(
+                    RangeSelector::new().buttons(vec![
                         SelectorButton::new()
                             .count(1)
                             .label("1m")
@@ -222,53 +174,35 @@ impl DynoPlot {
                             .step(SelectorStep::Hour)
                             .step_mode(StepMode::Backward),
                         SelectorButton::new().step(SelectorStep::All),
-                    ]))
-                    .tick_format_stops(vec![
-                        TickFormatStop::new()
-                            .dtick_range(vec![0, 1000])
-                            .value("%H:%M:%S.%L ms"),
-                        TickFormatStop::new()
-                            .dtick_range(vec![1000, 60000])
-                            .value("%H:%M:%S s"),
-                        TickFormatStop::new()
-                            .dtick_range(vec![60000, 3600000])
-                            .value("%H:%M m"),
-                        TickFormatStop::new()
-                            .dtick_range(vec![3600000, 86400000])
-                            .value("%H:%M h"),
-                        TickFormatStop::new()
-                            .dtick_range(vec![86400000, 604800000])
-                            .value("%e. %b d"),
-                        TickFormatStop::new()
-                            .dtick_range(vec!["M1", "M12"])
-                            .value("%b '%y M"),
                     ]),
-            )
-            .y_axis(Axis::new().title(Title::new("Speed")))
-            .y_axis2(
-                Axis::new()
-                    .title(Title::new("RPM"))
-                    .anchor("x")
-                    .overlaying("y")
-                    .side(AxisSide::Right),
-            )
-            .y_axis3(
-                Axis::new()
-                    .title(Title::new("Torque and HP"))
-                    .anchor("free")
-                    .overlaying("y")
-                    .position(0.000)
-                    .side(AxisSide::Left),
-            )
-            .auto_size(true);
+                ))
+                .y_axis(Axis::new().title(Title::new("Speed")))
+                .y_axis2(
+                    Axis::new()
+                        .title(Title::new("RPM"))
+                        .anchor("x")
+                        .overlaying("y")
+                        .side(AxisSide::Right),
+                )
+                .y_axis3(
+                    Axis::new()
+                        .title(Title::new("Torque and HP"))
+                        .anchor("free")
+                        .overlaying("y")
+                        .position(0.000)
+                        .side(AxisSide::Left),
+                )
+                .auto_size(true);
 
         self.plot.set_layout(layout);
         self
     }
 
     #[cfg(feature = "use_wasm")]
-    pub async fn render_to_canvas(&self, canvas: impl AsRef<str>) {
-        plotly::bindings::new_plot(canvas.as_ref(), &self.plot).await;
+    pub async fn render_to_canvas(self, canvas: impl ToString) {
+        let canvas = canvas.to_string();
+        let plot = self.plot;
+        plotly::bindings::new_plot(canvas.as_str(), &plot).await
     }
 }
 

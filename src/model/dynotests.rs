@@ -17,35 +17,6 @@ pub struct DynoTest {
     pub created_at: NaiveDateTime,
 }
 
-#[repr(i16)]
-#[derive(
-    Debug,
-    Default,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    serde::Deserialize,
-    serde::Serialize,
-)]
-pub enum MotorTy {
-    Electric = 0,
-    #[default]
-    Engine = 1,
-}
-
-impl From<i16> for MotorTy {
-    fn from(val: i16) -> Self {
-        match val {
-            0 => Self::Electric,
-            1 => Self::Engine,
-            _ => Self::Engine,
-        }
-    }
-}
-
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct DynoTestDataInfo {
     pub checksum_hex: String,
