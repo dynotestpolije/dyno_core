@@ -19,7 +19,6 @@ backend         = ["use_crypto", "dep:actix-web"]
 frontend        = []
 use_wasm        = ["uuid?/v7", "uuid?/js", "dep:web-sys", "plotly?/wasm"]
 use_excel       = ["dep:calamine", "dep:rust_xlsxwriter"]
-use_regex       = ["dep:regex"]
 use_chrono      = ["dep:chrono"]
 use_plot        = ["dep:plotly"]
 use_async       = ["use_tokio", "use_crossbeam"]
@@ -29,37 +28,42 @@ use_crypto      = ["password_hashing", "jwt_encode_decode", "checksum"]
 
 password_hashing  = ["dep:argon2", "dep:rand_core"]
 jwt_encode_decode = ["dep:jsonwebtoken", "dep:base64"]
-checksum          = ["dep:sha2"]
+checksum          = ["dep:sha256"]
 
 use_log         = []
-use_bincode     = []
 
 [dependencies]
 miniz_oxide         = { version = "0.7.1", features = ["std"] }
 derive_more         = { version = "^0.99" }
-lazy_static         = { version = "^1.4" }
 serde_json          = { version = "^1" }
 toml                = { version = "^0.7" }
 paste               = { version = "^1" }
 serde               = { version = "^1", features = ["derive"] }
-bincode             = { version = "^1.3" }
+flexbuffers         = { version = "^2" }
 
+uuid                = { optional = true, version = "^1", features = [ "serde", "v4" ] }
 chrono              = { optional = true, version = "^0.4", features = ["serde"]}
 log                 = { optional = true, version = "^0.4" }
-regex               = { optional = true, version = "^1.8" } # For checking if we need to skip auth
 tokio               = { optional = true, version = "^1.28", features = ["full"] }
 crossbeam-channel   = { optional = true, version = "^0.5" }
 calamine            = { optional = true, version = "^0.21", features = ["dates"] }
-rust_xlsxwriter     = { optional = true, version = "^0.41" }
+rust_xlsxwriter     = { optional = true, version = "^0.45" }
 
+### Cryptography ###
 base64              = { optional = true, version = "0.21" }
 argon2              = { optional = true, version = "^0.5" } 
 jsonwebtoken        = { optional = true, version = "^8" }
 rand_core           = { optional = true, version = "^0.6", features = ["std"] }
-sha2                = { optional = true, version = "^0.10" }
-plotly              = { optional = true, version = "^0.8" }
-actix-web           = { optional = true, version = "4.3.1", default-features = false }
+sha256              = { optional = true, version = "^1.3" }
+####################
 
+plotly              = { optional = true, version = "^0.8" }
+
+###### Server ######
+actix-web           = { optional = true, version = "4.3.1", default-features = false }
+####################
+
+###### WASM ######
 [dependencies.web-sys]
 optional = true
 version = "^0.3"
@@ -72,10 +76,9 @@ features = [
     "DomRect",
     "SvgElement",
 ]
+####################
+[dev-dependencies]
+lazy_static         = { version = "^1.4" }
 
-[dependencies.uuid]
-version = "^1.3"
-optional = true
-features = [ "serde", "v4" ] 
 # [profile.release]
 # debug = true

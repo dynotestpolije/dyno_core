@@ -1,84 +1,88 @@
 use chrono::NaiveDate;
+#[cfg(feature = "use_plot")]
 use dyno_core::{dynotests::DynoTest, BufferData, CompresedSaver, DynoPlot, PlotColor};
 use uuid::Uuid;
 
 fn main() {
-    let mut args = std::env::args();
-    let program_name = args.next().expect("this should not be happen");
-    let data_path = args.next().unwrap_or_else(|| {
-        eprintln!("ERROR: no arguments for file");
-        eprintln!("USAGE: {program_name} [file.dyno]");
-        std::process::exit(1);
-    });
-    let data = BufferData::decompress_from_path(&data_path).unwrap_or_else(|err| {
-        eprintln!("ERROR: Failed to decompress and deserialize `{data_path}` file");
-        eprintln!("RETURNED ERROR: {err}");
-        std::process::exit(1);
-    });
+    #[cfg(feature = "use_plot")]
+    {
+        let mut args = std::env::args();
+        let program_name = args.next().expect("this should not be happen");
+        let data_path = args.next().unwrap_or_else(|| {
+            eprintln!("ERROR: no arguments for file");
+            eprintln!("USAGE: {program_name} [file.dyno]");
+            std::process::exit(1);
+        });
+        let data = BufferData::decompress_from_path(&data_path).unwrap_or_else(|err| {
+            eprintln!("ERROR: Failed to decompress and deserialize `{data_path}` file");
+            eprintln!("RETURNED ERROR: {err}");
+            std::process::exit(1);
+        });
 
-    let plot = DynoPlot::new()
-        .create_dyno_plot(&data)
-        .set_color(PlotColor::dark());
+        let plot = DynoPlot::new()
+            .create_dyno_plot(&data)
+            .set_color(PlotColor::dark());
 
-    plot.show();
+        plot.show();
 
-    let historys = vec![
-        DynoTest {
-            id: 0,
-            user_id: 0,
-            info_id: None,
-            uuid: Uuid::new_v4(),
-            data_url: "data/data".to_owned(),
-            data_checksum: "checksum".to_owned(),
-            verified: false,
-            start: NaiveDate::from_ymd_opt(2010, 10, 10)
-                .unwrap()
-                .and_hms_milli_opt(10, 10, 10, 10)
-                .unwrap(),
-            stop: NaiveDate::from_ymd_opt(2010, 10, 10)
-                .unwrap()
-                .and_hms_milli_opt(10, 40, 3, 33)
-                .unwrap(),
-            updated_at: NaiveDate::from_ymd_opt(2010, 10, 10)
-                .unwrap()
-                .and_hms_milli_opt(10, 10, 10, 10)
-                .unwrap(),
-            created_at: NaiveDate::from_ymd_opt(2010, 10, 10)
-                .unwrap()
-                .and_hms_milli_opt(10, 10, 10, 10)
-                .unwrap(),
-        },
-        DynoTest {
-            id: 0,
-            user_id: 0,
-            info_id: None,
-            uuid: Uuid::new_v4(),
-            data_url: "data/data".to_owned(),
-            data_checksum: "checksum".to_owned(),
-            verified: false,
-            start: NaiveDate::from_ymd_opt(2010, 10, 14)
-                .unwrap()
-                .and_hms_milli_opt(8, 10, 10, 10)
-                .unwrap(),
-            stop: NaiveDate::from_ymd_opt(2010, 10, 14)
-                .unwrap()
-                .and_hms_milli_opt(8, 40, 1, 70)
-                .unwrap(),
-            updated_at: NaiveDate::from_ymd_opt(2010, 10, 14)
-                .unwrap()
-                .and_hms_milli_opt(10, 10, 10, 10)
-                .unwrap(),
-            created_at: NaiveDate::from_ymd_opt(2010, 10, 14)
-                .unwrap()
-                .and_hms_milli_opt(10, 10, 10, 10)
-                .unwrap(),
-        },
-    ];
-    let plot = DynoPlot::new()
-        .create_history_dyno(historys)
-        .set_color(PlotColor::dark());
+        let historys = vec![
+            DynoTest {
+                id: 0,
+                user_id: 0,
+                info_id: None,
+                uuid: Uuid::new_v4(),
+                data_url: "data/data".to_owned(),
+                data_checksum: "checksum".to_owned(),
+                verified: false,
+                start: NaiveDate::from_ymd_opt(2010, 10, 10)
+                    .unwrap()
+                    .and_hms_milli_opt(10, 10, 10, 10)
+                    .unwrap(),
+                stop: NaiveDate::from_ymd_opt(2010, 10, 10)
+                    .unwrap()
+                    .and_hms_milli_opt(10, 40, 3, 33)
+                    .unwrap(),
+                updated_at: NaiveDate::from_ymd_opt(2010, 10, 10)
+                    .unwrap()
+                    .and_hms_milli_opt(10, 10, 10, 10)
+                    .unwrap(),
+                created_at: NaiveDate::from_ymd_opt(2010, 10, 10)
+                    .unwrap()
+                    .and_hms_milli_opt(10, 10, 10, 10)
+                    .unwrap(),
+            },
+            DynoTest {
+                id: 0,
+                user_id: 0,
+                info_id: None,
+                uuid: Uuid::new_v4(),
+                data_url: "data/data".to_owned(),
+                data_checksum: "checksum".to_owned(),
+                verified: false,
+                start: NaiveDate::from_ymd_opt(2010, 10, 14)
+                    .unwrap()
+                    .and_hms_milli_opt(8, 10, 10, 10)
+                    .unwrap(),
+                stop: NaiveDate::from_ymd_opt(2010, 10, 14)
+                    .unwrap()
+                    .and_hms_milli_opt(8, 40, 1, 70)
+                    .unwrap(),
+                updated_at: NaiveDate::from_ymd_opt(2010, 10, 14)
+                    .unwrap()
+                    .and_hms_milli_opt(10, 10, 10, 10)
+                    .unwrap(),
+                created_at: NaiveDate::from_ymd_opt(2010, 10, 14)
+                    .unwrap()
+                    .and_hms_milli_opt(10, 10, 10, 10)
+                    .unwrap(),
+            },
+        ];
+        let plot = DynoPlot::new()
+            .create_history_dyno(historys)
+            .set_color(PlotColor::dark());
 
-    plot.show();
+        plot.show();
+    }
 }
 
 // use chrono::Local;

@@ -21,25 +21,66 @@ pub fn validate_nim(nim: impl AsRef<str>) -> DynoResult<()> {
     }
 }
 
+/// # validation email without using regex :) slower or faster? I dont know and I dont care.
+///
+/// # Example
+/// ```
+/// assert!(matches!(dyno_core::validate_email( "valid99_email@validemail.com" ), Ok(_)));
+/// assert!(matches!(dyno_core::validate_email( "valid.email123@validemail.com" ), Ok(_)));
+/// assert!(matches!(dyno_core::validate_email( "valid38-email@validemail.com" ), Ok(_)));
+///
+/// assert!(!matches!(dyno_core::validate_email( "invalid email@validemail.com" ), Ok(_)));
+/// assert!(!matches!(dyno_core::validate_email( "invalidemail@validemail" ), Ok(_)));
+/// assert!(!matches!(dyno_core::validate_email( "@validemail.com" ), Ok(_)));
+/// assert!(!matches!(dyno_core::validate_email( "invalidemail" ), Ok(_)));
+/// ```
+///
+/// # Errors
+/// [crate::DynoResult]
+/// [crate::DynoErr::validation_error]
+/// [crate::ErrKind::Validation]
+///
+/// This function will return an error if email is invalid.
 #[inline(always)]
 pub fn validate_email(val: impl AsRef<str>) -> DynoResult<()> {
     let val = val.as_ref();
-    if val.is_empty() || !val.contains('@') {
+    if let Some(at_index) = val.find('@') {
+        // Check for "." after "@" symbol
+        let user = &val[..at_index];
+        let domain = &val[at_index + 1..];
+        // validate the length of each part of the email, BEFORE doing the regex
+        // according to RFC5321 the max length of the local part is 64 characters
+        // and the max length of the domain part is 255 characters
+        // https://datatracker.ietf.org/doc/html/rfc5321#section-4.5.3.1.1
+        if user.chars().count() > 64 || domain.chars().count() > 255 {
+            return Err(DynoErr::validation_error(
+                "Invalid email: lenght email must greather than 64 or 255 characters",
+            ));
+        }
+        // if domain part is empty or not contains dot.
+        if domain.is_empty() || !domain.contains('.') {
+            return Err(DynoErr::validation_error(
+                "Invalid email: the domain part is invalid",
+            ));
+        }
+        // if user part is empty or contains spaces.
+        if user.is_empty() || user.contains(' ') {
+            return Err(DynoErr::validation_error(
+                "Invalid email: the user part is invalid",
+            ));
+        }
+        // if user part is not alphanumeric with/without '.' or '-'
+        if user
+            .chars()
+            .any(|c| !(c.is_alphanumeric() || c == '.' || c == '-' || c == '_'))
+        {
+            return Err(DynoErr::validation_error(
+                "Invalid email: the user part is invalid, user must be alphanumeric with optional ['.', '-'] without a space",
+            ));
+        }
+    } else {
         return Err(DynoErr::validation_error(
             "Invalid email: email must contains '@'",
-        ));
-    }
-    let parts: Vec<&str> = val.rsplitn(2, '@').collect();
-    let user_part = parts[1];
-    let domain_part = parts[0];
-
-    // validate the length of each part of the email, BEFORE doing the regex
-    // according to RFC5321 the max length of the local part is 64 characters
-    // and the max length of the domain part is 255 characters
-    // https://datatracker.ietf.org/doc/html/rfc5321#section-4.5.3.1.1
-    if user_part.chars().count() > 64 || domain_part.chars().count() > 255 {
-        return Err(DynoErr::validation_error(
-            "Invalid email: lenght email must greather than 64 or 255 characters",
         ));
     }
 

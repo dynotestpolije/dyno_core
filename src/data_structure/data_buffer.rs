@@ -10,6 +10,7 @@ pub struct Data {
     pub horsepower: HorsePower,
     pub temp: Celcius,
     pub time_stamp: NaiveDateTime,
+    pub total_time: u64,
     pub rpm_roda: RotationPerMinute,
     pub rpm_engine: RotationPerMinute,
     pub odo: KiloMetres,
@@ -23,11 +24,11 @@ impl Data {
             ..Default::default()
         }
     }
-    pub fn from_self(&mut self, other: Self) {
-        let tmp = self.odo;
-        *self = other;
-        self.odo += tmp;
+
+    pub fn from_self(&mut self, mut other: Self) {
+        core::mem::swap(self, &mut other);
     }
+
     pub fn filter(&mut self, filter: &mut DataFilter) {
         self.rpm_roda = filter.rpm_roda.next(self.rpm_roda);
         self.rpm_engine = filter.rpm_engine.next(self.rpm_engine);
@@ -49,6 +50,7 @@ impl Data {
             ..
         } = serial_data;
 
+        self.total_time += serial_data.period as u64;
         let delta_ms = period as Float;
 
         // let pulse_enc = if pulse_enc > 2_000_000 {
@@ -146,8 +148,18 @@ impl Data {
     }
 }
 
+impl<'ser> crate::CompresedSaver<'ser> for Data {
+    #[inline]
+    fn size_limit() -> usize {
+        core::mem::size_of::<Self>()
+    }
+}
+
 #[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
 pub struct BufferData {
+    pub len: usize,
+    pub data: Data,
+
     pub speed: Buffer<KilometresPerHour>,
     pub rpm_roda: Buffer<RotationPerMinute>,
     pub rpm_engine: Buffer<RotationPerMinute>,
@@ -155,13 +167,22 @@ pub struct BufferData {
     pub horsepower: Buffer<HorsePower>,
     pub temp: Buffer<Celcius>,
     pub time_stamp: Buffer<i64>,
+}
 
-    pub data: Data,
-    pub len: usize,
-
-    #[serde(skip)]
-    #[serde(default)]
-    pub total_time: u64,
+impl<'ser> crate::CompresedSaver<'ser> for BufferData {
+    #[inline]
+    fn size_limit() -> usize {
+        Buffer::<KilometresPerHour>::size_limit()
+            + Buffer::<RotationPerMinute>::size_limit()
+            + Buffer::<RotationPerMinute>::size_limit()
+            + Buffer::<NewtonMeter>::size_limit()
+            + Buffer::<HorsePower>::size_limit()
+            + Buffer::<Celcius>::size_limit()
+            + Buffer::<i64>::size_limit()
+            + Data::size_limit()
+            + core::mem::size_of::<usize>()
+            + core::mem::size_of::<u64>()
+    }
 }
 
 #[repr(usize)]
@@ -230,7 +251,6 @@ impl BufferData {
         config: &'_ mut crate::config::DynoConfig,
         serial_data: crate::SerialData,
     ) {
-        self.total_time += serial_data.period as u64;
         self.data.from_serial(config, serial_data);
         self.data.filter(&mut config.filter);
         self.process_data();
@@ -251,9 +271,9 @@ impl BufferData {
 
     #[inline]
     pub fn time_fmt(&self) -> String {
-        let seconds = (self.total_time / 1000) % 60;
-        let minutes = (self.total_time / (1000 * 60)) % 60;
-        let hours = (self.total_time / (1000 * 60 * 60)) % 24;
+        let seconds = (self.data.total_time / 1000) % 60;
+        let minutes = (self.data.total_time / (1000 * 60)) % 60;
+        let hours = (self.data.total_time / (1000 * 60 * 60)) % 24;
         format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
     }
 
@@ -384,71 +404,28 @@ impl crate::ExcelSaver for BufferData {
                 Self::BUFFER_NAME[col],
                 &format_header,
             )?;
+            macro_rules! process_col {
+                ($data:ident, $write:ident) => {{
+                    for (index, value) in self.$data.iter().enumerate() {
+                        let row = (index + 1) as _;
+                        if let Err(err) = worksheet.$write(row, col as _, value.to_f64()) {
+                            log::error!("{err}")
+                        }
+                    }
+                }};
+            }
             match col {
-                0 => self.speed.iter().enumerate().for_each(|(index, value)| {
-                    if let Err(err) =
-                        worksheet.write_number((index + 1) as _, col as _, value.to_f64())
-                    {
-                        log::error!("{err}")
-                    }
-                }),
-                1 => self.rpm_roda.iter().enumerate().for_each(|(index, value)| {
-                    if let Err(err) =
-                        worksheet.write_number((index + 1) as _, col as _, value.to_f64())
-                    {
-                        log::error!("{err}")
-                    }
-                }),
-                2 => self
-                    .rpm_engine
-                    .iter()
-                    .enumerate()
-                    .for_each(|(index, value)| {
-                        if let Err(err) =
-                            worksheet.write_number((index + 1) as _, col as _, value.to_f64())
-                        {
-                            log::error!("{err}")
-                        }
-                    }),
-
-                3 => self.torque.iter().enumerate().for_each(|(index, value)| {
-                    if let Err(err) =
-                        worksheet.write_number((index + 1) as _, col as _, value.to_f64())
-                    {
-                        log::error!("{err}")
-                    }
-                }),
-
-                4 => self
-                    .horsepower
-                    .iter()
-                    .enumerate()
-                    .for_each(|(index, value)| {
-                        if let Err(err) =
-                            worksheet.write_number((index + 1) as _, col as _, value.to_f64())
-                        {
-                            log::error!("{err}")
-                        }
-                    }),
-
-                5 => self.temp.iter().enumerate().for_each(|(index, value)| {
-                    if let Err(err) =
-                        worksheet.write_number((index + 1) as _, col as _, value.to_f64())
-                    {
-                        log::error!("{err}")
-                    }
-                }),
-
-                6 => self
-                    .time_stamp
-                    .iter()
-                    .enumerate()
-                    .for_each(|(index, value)| {
-                        let date_time = match NaiveDateTime::from_timestamp_millis(*value as _) {
-                            Some(k) => k,
-                            None => Default::default(),
-                        };
-                        if let Err(err) = worksheet.write_datetime(
+                0 => process_col!(speed, write_number),
+                1 => process_col!(rpm_roda, write_number),
+                2 => process_col!(rpm_engine, write_number),
+                3 => process_col!(torque, write_number),
+                4 => process_col!(horsepower, write_number),
+                5 => process_col!(temp, write_number),
+                6 => {
+                    for (index, value) in self.time_stamp.iter().enumerate() {
+                        let date_time = rust_xlsxwriter::ExcelDateTime::from_timestamp(*value)
+                            .map_err(crate::DynoErr::from)?;
+                        if let Err(err) = worksheet.write_datetime_with_format(
                             (index + 1) as _,
                             col as _,
                             &date_time,
@@ -456,7 +433,8 @@ impl crate::ExcelSaver for BufferData {
                         ) {
                             log::error!("{err}")
                         }
-                    }),
+                    }
+                }
                 _ => unreachable!(),
             };
         }

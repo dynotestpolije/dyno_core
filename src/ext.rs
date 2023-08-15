@@ -133,81 +133,101 @@ impl<N: Numeric> Num<N> {
 
 crate::macros::impl_numeric_float!(f32 f64);
 crate::macros::impl_numeric_integer!(i8 u8 i16 u16 i32 u32 i64 u64 isize usize);
-
 #[cfg(has_i128)]
 crate::macros::impl_numeric_integer!(i128);
 
-#[inline(always)]
-pub fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
-    unsafe {
-        ::core::slice::from_raw_parts((p as *const T) as *const u8, ::core::mem::size_of::<T>())
-    }
-}
-#[inline(always)]
-pub fn any_from_u8_slice<T: Sized>(b: &[u8]) -> T {
-    assert!(b.len() == ::core::mem::size_of::<T>());
-    unsafe { ::core::ptr::read::<T>(b.as_ptr() as *const T) }
-}
-
-pub trait BinSerializeDeserialize: serde::Serialize + serde::de::DeserializeOwned {
+pub trait BinSerialize<'ser>: serde::Serialize {
+    /// Serializing Struct implements serde::Serialize
     #[inline(always)]
-    fn serialize_bin(&self) -> crate::DynoResult<Vec<u8>> {
-        use bincode::Options;
-        bincode::DefaultOptions::new()
-            .with_fixint_encoding()
-            .allow_trailing_bytes()
-            .serialize(self)
-            .map_err(crate::DynoErr::serialize_error)
+    fn serialize_bin(&self) -> crate::DynoResult<flexbuffers::FlexbufferSerializer> {
+        let mut s = flexbuffers::FlexbufferSerializer::new();
+        self.serialize(&mut s)?;
+        Ok(s)
     }
-
-    #[inline(always)]
-    fn deserialize_bin(bin: &[u8]) -> crate::DynoResult<Self> {
-        use bincode::Options;
-        bincode::DefaultOptions::new()
-            .with_fixint_encoding()
-            .allow_trailing_bytes()
-            .deserialize(bin)
-            .map_err(crate::DynoErr::deserialize_error)
-    }
-
+    #[cfg(not(target_family = "wasm"))]
     #[deprecated(note = "use the `CompresedSaver::compress_to_file()` instead")]
     fn serialize_to_file<P: AsRef<std::path::Path>>(&self, path: P) -> crate::DynoResult<()> {
         let data = self.serialize_bin()?;
-        std::fs::write(path, data).map_err(From::from)
+        std::fs::write(path, data.view()).map_err(From::from)
+    }
+}
+
+pub trait BinDeserialize: serde::de::DeserializeOwned {
+    #[inline(always)]
+    fn deserialize_bin(bin: impl AsRef<[u8]>) -> crate::DynoResult<Self> {
+        let root = flexbuffers::Reader::get_root(bin.as_ref())?;
+        Self::deserialize(root).map_err(From::from)
     }
 
+    #[cfg(not(target_family = "wasm"))]
     #[deprecated(note = "use the `CompresedSaver::decompress_from_file()` instead")]
     fn deserialize_from_file<P: AsRef<std::path::Path>>(path: P) -> crate::DynoResult<Self> {
         let data = std::fs::read(path)?;
-        bincode::deserialize(&data).map_err(crate::DynoErr::deserialize_error)
+        Self::deserialize_bin(data).map_err(From::from)
     }
     // add code here
 }
 
-impl<T: serde::Serialize + serde::de::DeserializeOwned> BinSerializeDeserialize for T {}
+pub async fn serialize_to_file<'a, S: BinSerialize<'a> + std::marker::Send + 'static>(
+    item: S,
+    path: impl AsRef<std::path::Path>,
+) -> crate::DynoResult<()> {
+    match tokio::task::spawn_blocking(move || item.serialize_bin().map(|mut x| x.take_buffer()))
+        .await
+    {
+        Ok(Ok(content)) => tokio::fs::write(path, content).await.map_err(From::from),
+        Ok(Err(err)) => Err(err),
+        Err(err) => Err(crate::DynoErr::async_task_error(err)),
+    }
+}
 
-pub trait CompresedSaver: BinSerializeDeserialize {
+pub async fn deserialize_from_file_async<S>(
+    path: impl AsRef<std::path::Path>,
+) -> crate::DynoResult<S>
+where
+    S: BinDeserialize + std::marker::Send + 'static,
+{
+    let data = tokio::fs::read(path).await?;
+    match tokio::task::spawn_blocking(move || S::deserialize_bin(data)).await {
+        Ok(res) => res,
+        Err(err) => Err(crate::DynoErr::async_task_error(err)),
+    }
+}
+
+impl<T: serde::de::DeserializeOwned> BinDeserialize for T {}
+impl<'ser, T: serde::Serialize> BinSerialize<'ser> for T {}
+
+pub trait CompresedSaver<'ser>: BinDeserialize + BinSerialize<'ser> {
+    #[inline]
+    fn size_limit() -> usize {
+        core::mem::size_of::<Self>()
+    }
+
     #[inline]
     fn compress(&self) -> crate::DynoResult<Vec<u8>> {
-        let serialized = self.serialize_bin()?;
-        Ok(miniz_oxide::deflate::compress_to_vec(&serialized, 6))
+        self.serialize_bin()
+            .map(|ser| miniz_oxide::deflate::compress_to_vec(ser.view(), 6))
     }
+
     #[inline]
     fn decompress(data: impl AsRef<[u8]>) -> crate::DynoResult<Self> {
-        miniz_oxide::inflate::decompress_to_vec(data.as_ref())
+        miniz_oxide::inflate::decompress_to_vec_with_limit(data.as_ref(), Self::size_limit())
             .map_err(crate::DynoErr::encoding_decoding_error)
-            .and_then(|data| Self::deserialize_bin(&data))
+            .and_then(|data| Self::deserialize_bin(data))
     }
+
+    #[cfg(not(target_family = "wasm"))]
     fn compress_to_path<P: AsRef<std::path::Path>>(&self, path: P) -> crate::DynoResult<()> {
         std::fs::write(path, self.compress()?).map_err(From::from)
     }
+    #[cfg(not(target_family = "wasm"))]
     fn decompress_from_path<P: AsRef<std::path::Path>>(path: P) -> crate::DynoResult<Self> {
         let data = std::fs::read(path)?;
         Self::decompress(data)
     }
 }
 
-impl<T: BinSerializeDeserialize> CompresedSaver for T {}
+// impl<'ser, T: BinSerialize<'ser> + BinDeserialize> CompresedSaver<'ser> for T {}
 
 pub trait CsvSaver: Sized {
     const CSV_DELIMITER: &'static str;

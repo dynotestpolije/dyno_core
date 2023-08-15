@@ -49,32 +49,27 @@ pub use chrono;
 
 pub use log;
 
-#[cfg(feature = "use_regex")]
-pub use regex;
-
 #[cfg(feature = "use_tokio")]
 pub use tokio;
 
 #[cfg(feature = "use_crossbeam")]
 pub use crossbeam_channel;
 
-pub use lazy_static;
-
 pub use paste;
 
 pub mod float {
-    #[cfg(target_pointer_width = "32")]
-    pub use std::f32::*;
+    // #[cfg(target_pointer_width = "32")]
+    // pub use std::f32::*;
 
-    #[cfg(target_pointer_width = "64")]
+    // #[cfg(target_pointer_width = "64")]
     pub use std::f64::*;
 }
 
-#[cfg(target_pointer_width = "64")]
+// #[cfg(target_pointer_width = "64")]
 pub type Float = f64;
 
-#[cfg(target_pointer_width = "32")]
-pub type Float = f32;
+// #[cfg(target_pointer_width = "32")]
+// pub type Float = f32;
 
 pub const PI: Float = float::consts::PI;
 pub const GRAVITY_SPEED: Float = 9.806_65;

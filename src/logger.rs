@@ -1,4 +1,4 @@
-use log::{Level, LevelFilter, Log, Metadata, Record};
+use log::{LevelFilter, Log, Metadata, Record};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -7,10 +7,6 @@ use std::sync::Mutex;
 use std::time::SystemTime;
 
 use crate::{DynoErr, DynoResult};
-#[cfg(feature = "frontend")]
-lazy_static::lazy_static! {
-    pub static ref RECORDS_LOGGER: Mutex<Vec<(Level, String)>> = Default::default();
-}
 
 enum LoggerType {
     Console,
@@ -57,28 +53,18 @@ impl Log for DynoLogger {
     #[inline]
     fn log(&self, record: &Record) {
         let level = record.level();
-        let target = record.metadata().target();
-        let pid = std::process::id();
-
-        let args = record.args();
         let fmt = format!(
-            "[{}]-[{target}]-[thread:{pid}]-[{level:6}]-{args}\n",
-            chrono::Utc::now().format("%v %T"),
+            "[{time}]-[{target}]-[{level:6}]-{args}\n",
+            time = chrono::Local::now().format("%v %T"),
+            target = record.metadata().target(),
+            args = record.args(),
         );
         {
-            self.logtype
-                .lock()
-                .map(|mut x| match *x {
+            if let Ok(mut lt) = self.logtype.lock() {
+                match &mut *lt {
                     LoggerType::Console => eprintln!("{fmt}"),
                     LoggerType::File(ref mut file) => file.log(&fmt),
-                })
-                .ok();
-        }
-
-        #[cfg(feature = "frontend")]
-        {
-            if let Ok(mut locked) = RECORDS_LOGGER.lock() {
-                locked.push((level, fmt));
+                }
             }
         }
     }
