@@ -148,13 +148,6 @@ impl Data {
     }
 }
 
-impl<'ser> crate::CompresedSaver<'ser> for Data {
-    #[inline]
-    fn size_limit() -> usize {
-        core::mem::size_of::<Self>()
-    }
-}
-
 #[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
 pub struct BufferData {
     pub len: usize,
@@ -167,22 +160,6 @@ pub struct BufferData {
     pub horsepower: Buffer<HorsePower>,
     pub temp: Buffer<Celcius>,
     pub time_stamp: Buffer<i64>,
-}
-
-impl<'ser> crate::CompresedSaver<'ser> for BufferData {
-    #[inline]
-    fn size_limit() -> usize {
-        Buffer::<KilometresPerHour>::size_limit()
-            + Buffer::<RotationPerMinute>::size_limit()
-            + Buffer::<RotationPerMinute>::size_limit()
-            + Buffer::<NewtonMeter>::size_limit()
-            + Buffer::<HorsePower>::size_limit()
-            + Buffer::<Celcius>::size_limit()
-            + Buffer::<i64>::size_limit()
-            + Data::size_limit()
-            + core::mem::size_of::<usize>()
-            + core::mem::size_of::<u64>()
-    }
 }
 
 #[repr(usize)]

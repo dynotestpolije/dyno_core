@@ -38,16 +38,6 @@ impl PointShowed {
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Buffer<T>(Vec<T>);
 
-impl<'ser, T> crate::CompresedSaver<'ser> for Buffer<T>
-where
-    T: serde::Serialize + serde::de::DeserializeOwned,
-{
-    #[inline]
-    fn size_limit() -> usize {
-        Self::MAX_CAP_BUFFER * Self::SIZE_OF_T
-    }
-}
-
 impl<T: Numeric> std::ops::Deref for Buffer<T> {
     type Target = Vec<T>;
     #[inline(always)]

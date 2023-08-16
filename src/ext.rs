@@ -19,6 +19,7 @@ pub trait FloatMath {
     /// ```
     fn round_decimal(self, decimal: i32) -> Self::Output;
 }
+
 impl FloatMath for super::Float {
     type Output = super::Float;
 
@@ -199,11 +200,6 @@ impl<'ser, T: serde::Serialize> BinSerialize<'ser> for T {}
 
 pub trait CompresedSaver<'ser>: BinDeserialize + BinSerialize<'ser> {
     #[inline]
-    fn size_limit() -> usize {
-        core::mem::size_of::<Self>()
-    }
-
-    #[inline]
     fn compress(&self) -> crate::DynoResult<Vec<u8>> {
         self.serialize_bin()
             .map(|ser| miniz_oxide::deflate::compress_to_vec(ser.view(), 6))
@@ -211,7 +207,7 @@ pub trait CompresedSaver<'ser>: BinDeserialize + BinSerialize<'ser> {
 
     #[inline]
     fn decompress(data: impl AsRef<[u8]>) -> crate::DynoResult<Self> {
-        miniz_oxide::inflate::decompress_to_vec_with_limit(data.as_ref(), Self::size_limit())
+        miniz_oxide::inflate::decompress_to_vec_with_limit(data.as_ref(), u32::MAX as _)
             .map_err(crate::DynoErr::encoding_decoding_error)
             .and_then(|data| Self::deserialize_bin(data))
     }
@@ -220,12 +216,15 @@ pub trait CompresedSaver<'ser>: BinDeserialize + BinSerialize<'ser> {
     fn compress_to_path<P: AsRef<std::path::Path>>(&self, path: P) -> crate::DynoResult<()> {
         std::fs::write(path, self.compress()?).map_err(From::from)
     }
+
     #[cfg(not(target_family = "wasm"))]
     fn decompress_from_path<P: AsRef<std::path::Path>>(path: P) -> crate::DynoResult<Self> {
         let data = std::fs::read(path)?;
         Self::decompress(data)
     }
 }
+
+impl<'ser, T: BinDeserialize + BinSerialize<'ser>> CompresedSaver<'ser> for T {}
 
 // impl<'ser, T: BinSerialize<'ser> + BinDeserialize> CompresedSaver<'ser> for T {}
 
