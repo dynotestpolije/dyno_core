@@ -195,9 +195,6 @@ where
     }
 }
 
-impl<T: serde::de::DeserializeOwned> BinDeserialize for T {}
-impl<'ser, T: serde::Serialize> BinSerialize<'ser> for T {}
-
 pub trait CompresedSaver<'ser>: BinDeserialize + BinSerialize<'ser> {
     #[inline]
     fn compress(&self) -> crate::DynoResult<Vec<u8>> {
@@ -224,6 +221,8 @@ pub trait CompresedSaver<'ser>: BinDeserialize + BinSerialize<'ser> {
     }
 }
 
+impl<T: serde::de::DeserializeOwned> BinDeserialize for T {}
+impl<'ser, T: serde::Serialize> BinSerialize<'ser> for T {}
 impl<'ser, T: BinDeserialize + BinSerialize<'ser>> CompresedSaver<'ser> for T {}
 
 // impl<'ser, T: BinSerialize<'ser> + BinDeserialize> CompresedSaver<'ser> for T {}
